@@ -38,6 +38,28 @@ _FORWARD_ENV_KEYS = (
     "ANTHROPIC_API_KEY",
 )
 
+# Appended (not replacing) guidance that applies whenever the agent is driving a
+# non-interactive, verifier-scored task. Intentionally generic and short: only
+# facts that are true for any terminal-bench-style task, no task-specific hints.
+_DEFAULT_BENCH_APPEND_PROMPT = (
+    "You are running non-interactively on a scored task. A hidden verification suite will\n"
+    "check your work after your final turn; there is no opportunity for follow-up.\n\n"
+    "Work practices:\n"
+    "- Start by examining the environment the task actually hands you (cwd contents, referenced\n"
+    "  files, installed tools) before planning.\n"
+    "- Treat every constraint in the task description as binding: exact output paths, file\n"
+    "  formats, field names, value ranges, and any 'do not modify X' clauses.\n"
+    "- When replacing values inside files, replace only the exact target value and preserve the\n"
+    "  surrounding structure; do not restructure, reformat, or 'improve' unrelated content.\n"
+    "- Do not modify files that are not part of the task, even if they contain similar-looking\n"
+    "  content (examples, READMEs, placeholders, vendored copies, etc.).\n"
+    "- Before finishing, verify your result: read the output file(s) back, run the produced\n"
+    "  program/script, or run the task's own test command when one is obvious. Fix any\n"
+    "  mismatch before ending the turn.\n"
+    "- Prefer small, targeted tool calls over large speculative ones; avoid repeating commands\n"
+    "  whose answer you already have.\n"
+)
+
 def _resolve_bundle_dir() -> Path:
     env_dir = os.environ.get("PI_BENCH_BUNDLE_DIR")
     if env_dir:
@@ -164,6 +186,10 @@ class PiBenchAgent(HarborBaseAgent):  # type: ignore[misc]
         self.thinking: str = os.environ.get("PI_BENCH_THINKING", "high")
         self.tools: str = os.environ.get("PI_BENCH_TOOLS", "read,bash,edit,write")
         self.system_prompt: str = os.environ.get("PI_BENCH_SYSTEM_PROMPT", "")
+        self.append_system_prompt: str = os.environ.get(
+            "PI_BENCH_APPEND_SYSTEM_PROMPT",
+            _DEFAULT_BENCH_APPEND_PROMPT,
+        )
         self.extra_args: str = os.environ.get("PI_BENCH_EXTRA_ARGS", "")
         self.bundle_dir = _resolve_bundle_dir()
         self._remote_binary = f"{_REMOTE_BUNDLE_DIR}/pi-linux-arm64"
@@ -267,11 +293,15 @@ class PiBenchAgent(HarborBaseAgent):  # type: ignore[misc]
                 f"thinking={self.thinking}",
                 f"tools={self.tools}",
                 f"system_prompt_provided={'yes' if self.system_prompt else 'no'}",
+                f"append_system_prompt_chars={len(self.append_system_prompt)}",
                 f"extra_args={self.extra_args or '<none>'}",
                 "=== PI EVENT STREAM (JSONL) ===",
             ]
         )
         prompt_flag = f" --system-prompt {shlex.quote(self.system_prompt)}" if self.system_prompt else ""
+        append_flag = ""
+        if self.append_system_prompt:
+            append_flag = f" --append-system-prompt {shlex.quote(self.append_system_prompt)}"
         extra_args = ""
         if self.extra_args.strip():
             extra_args = " " + " ".join(shlex.quote(arg) for arg in shlex.split(self.extra_args))
@@ -279,7 +309,7 @@ class PiBenchAgent(HarborBaseAgent):  # type: ignore[misc]
             f"cat <<'EOF' >{log_file}\n{config_block}\nEOF\n"
             f"{binary} --mode json --no-session --no-context-files --no-extensions --no-skills "
             f"--no-prompt-templates --no-themes --tools {shlex.quote(self.tools)} --thinking {shlex.quote(self.thinking)} "
-            f"--model {shlex.quote(self.model)}{prompt_flag}{extra_args} "
+            f"--model {shlex.quote(self.model)}{prompt_flag}{append_flag}{extra_args} "
             f"{shlex.quote(instruction)} >{event_log} 2>{debug_log}; "
             "PI_EXIT=$?; "
             f"cat {event_log} >> {log_file} 2>/dev/null; "
