@@ -72,6 +72,7 @@ import { extensionForImageMimeType, readClipboardImage } from "../../utils/clipb
 import { parseGitUrl } from "../../utils/git.js";
 import { killTrackedDetachedChildren } from "../../utils/shell.js";
 import { ensureTool } from "../../utils/tools-manager.js";
+import { VoiceController } from "./audio/voice-controller.js";
 import { ArminComponent } from "./components/armin.js";
 import { AssistantMessageComponent } from "./components/assistant-message.js";
 import { BashExecutionComponent } from "./components/bash-execution.js";
@@ -161,6 +162,40 @@ function isTruthyEnvFlag(value: string | undefined): boolean {
 
 function isUnknownModel(model: Model<any> | undefined): boolean {
 	return !!model && model.provider === "unknown" && model.id === "unknown" && model.api === "unknown";
+}
+
+const VOICE_SPINNER_FRAMES = ["⠋", "⠙", "⠹", "⠸", "⠼", "⠴", "⠦", "⠧", "⠇", "⠏"];
+
+/**
+ * Compose the voice-mode status text drawn as a placeholder inside the
+ * editor. Uses the `accent` theme color for the idle indicator (calm teal
+ * that matches pi branding) and `error` (muted red) for the active
+ * recording light, the way physical recording LEDs look.
+ */
+function buildVoiceStatusLine(controller: VoiceController, voiceModeEnabled: boolean): string {
+	if (controller.isTranscribing()) {
+		const dot = theme.bold(theme.fg("accent", "◉"));
+		return `${dot} ${theme.fg("dim", "Transcribing…")}`;
+	}
+	const key = (label: string) => theme.fg("muted", label);
+	const desc = (label: string) => theme.fg("dim", label);
+	const sep = theme.fg("dim", "·");
+	if (controller.isRecording()) {
+		const dot = theme.bold(theme.fg("error", "◉"));
+		const frame = VOICE_SPINNER_FRAMES[controller.getTick() % VOICE_SPINNER_FRAMES.length];
+		const elapsed = controller.getElapsedSeconds();
+		const min = String(Math.floor(elapsed / 60)).padStart(2, "0");
+		const sec = String(elapsed % 60).padStart(2, "0");
+		const active = theme.fg("error", `${frame} Rec ${min}:${sec}`);
+		const hint = `${key("space")} ${desc("send")} ${sep} ${key("shift+space")} ${desc("or")} ${key("type")} ${desc("to enter text input")}`;
+		return `${dot} ${active}  ${hint}`;
+	}
+	if (voiceModeEnabled) {
+		const dot = theme.bold(theme.fg("accent", "◉"));
+		const hint = `${key("space")} ${desc("record")} ${sep} ${key("shift+space")} ${desc("or")} ${key("type")} ${desc("to enter text input")}`;
+		return `${dot} ${hint}`;
+	}
+	return "";
 }
 
 function hasDefaultModelProvider(providerId: string): providerId is keyof typeof defaultModelPerProvider {
@@ -283,6 +318,22 @@ export class InteractiveMode {
 
 	// Header container that holds the built-in or custom header
 	private headerContainer: Container;
+
+	// Voice (audio) input support. Space toggles recording in voice mode;
+	// ctrl+space toggles into text-input mode (transcribing any in-flight
+	// recording into the editor without sending).
+	private voiceController: VoiceController | undefined;
+	private voiceModeEnabled = true;
+	// Editor to route transcription results into. Captured when a stop/finish
+	// is initiated so that async transcription can't race with subsequent
+	// editor swaps (selectors, extension-installed custom editors, etc.).
+	private voiceTargetEditor: EditorComponent | undefined;
+	// Submit hook state. While transcription is in flight we replace the
+	// target editor's onSubmit with a buffer so the user can type AND press
+	// enter during the latency window without losing either the typed text
+	// or the transcript.
+	private voiceOriginalOnSubmit?: EditorComponent["onSubmit"];
+	private voicePendingSubmit?: string;
 
 	// Built-in header (logo + keybinding hints + changelog)
 	private builtInHeader: Component | undefined = undefined;
@@ -547,6 +598,9 @@ export class InteractiveMode {
 				hint("app.message.dequeue", "to edit all queued messages"),
 				hint("app.clipboard.pasteImage", "to paste image"),
 				rawKeyHint("drop files", "to attach"),
+				rawKeyHint("space", "voice: start/stop recording & send"),
+				rawKeyHint("shift+space or type", "voice: switch to text input (transcribes in-flight recording)"),
+				rawKeyHint("/voice", "re-enter voice mode from text input"),
 			].join("\n");
 			const compactInstructions = [
 				hint("app.interrupt", "interrupt"),
@@ -588,6 +642,8 @@ export class InteractiveMode {
 		this.ui.addChild(this.widgetContainerAbove);
 		this.ui.addChild(this.editorContainer);
 		this.ui.addChild(this.widgetContainerBelow);
+
+		this.initVoiceInput();
 		this.ui.addChild(this.footer);
 		this.ui.setFocus(this.editor);
 
@@ -2142,6 +2198,14 @@ export class InteractiveMode {
 				if (!customEditor.onExtensionShortcut) {
 					customEditor.onExtensionShortcut = (data: string) => this.defaultEditor.onExtensionShortcut?.(data);
 				}
+				// Forward voice-mode hooks so space/shift+space and the recording
+				// indicator keep working after an extension swaps the editor.
+				if (!customEditor.onVoiceInput) {
+					customEditor.onVoiceInput = this.defaultEditor.onVoiceInput;
+				}
+				if (!customEditor.placeholderLine) {
+					customEditor.placeholderLine = this.defaultEditor.placeholderLine;
+				}
 				// Copy action handlers (clear, suspend, model switching, etc.)
 				for (const [action, handler] of this.defaultEditor.actionHandlers) {
 					(customEditor.actionHandlers as Map<string, () => void>).set(action, handler);
@@ -2486,6 +2550,11 @@ export class InteractiveMode {
 			if (text === "/quit") {
 				this.editor.setText("");
 				await this.shutdown();
+				return;
+			}
+			if (text === "/voice") {
+				this.editor.setText("");
+				this.enterVoiceMode();
 				return;
 			}
 
@@ -3133,6 +3202,8 @@ export class InteractiveMode {
 		if (this.isShuttingDown) return;
 		this.isShuttingDown = true;
 		this.unregisterSignalHandlers();
+		this.voiceController?.dispose();
+		this.voiceController = undefined;
 		await this.runtimeHost.dispose();
 
 		// Wait for any pending renders to complete
@@ -3379,6 +3450,268 @@ export class InteractiveMode {
 			// Force full re-render since external editor uses alternate screen
 			this.ui.requestRender(true);
 		}
+	}
+
+	// =========================================================================
+	// Voice input
+	// =========================================================================
+
+	private initVoiceInput(): void {
+		if (this.voiceController) return;
+
+		this.voiceController = new VoiceController({
+			getApiKey: () => this.session.modelRegistry.getApiKeyForProvider("openai"),
+			getBaseUrl: () => this.getOpenAIBaseUrl(),
+			onResult: (text) => this.handleVoiceResult(text),
+			onFinish: (text) => this.handleVoiceFinish(text),
+			onTranscriptionEnd: () => this.finalizeVoiceSession(),
+			onStateChange: () => this.ui.requestRender(),
+			onError: (message) => this.showError(message),
+		});
+
+		this.defaultEditor.onVoiceInput = (data, keyInfo) => this.handleVoiceKey(data, keyInfo);
+		this.defaultEditor.placeholderLine = () => this.getVoicePlaceholder();
+		this.ui.requestRender();
+	}
+
+	/**
+	 * Resolve the configured OpenAI base URL so installations that route
+	 * the `openai` provider through a proxy (corporate gateway, Azure
+	 * OpenAI, OpenRouter alias, etc.) transcribe against the same endpoint
+	 * as chat requests. Falls back to the SDK default when no override is
+	 * configured.
+	 */
+	private getOpenAIBaseUrl(): string | undefined {
+		try {
+			const models = this.session.modelRegistry.getAvailable();
+			const openaiModel = models.find((m) => m.provider === "openai");
+			return openaiModel?.baseUrl || undefined;
+		} catch {
+			return undefined;
+		}
+	}
+
+	private getVoicePlaceholder(): string | undefined {
+		const controller = this.voiceController;
+		if (!controller) return undefined;
+		if (!this.voiceModeEnabled && !controller.isRecording() && !controller.isTranscribing()) {
+			return undefined;
+		}
+		return buildVoiceStatusLine(controller, this.voiceModeEnabled);
+	}
+
+	private enterVoiceMode(): void {
+		if (this.voiceModeEnabled) return;
+		this.voiceModeEnabled = true;
+		this.ui.requestRender();
+	}
+
+	private exitVoiceMode(): void {
+		if (!this.voiceModeEnabled) return;
+		this.voiceModeEnabled = false;
+		this.ui.requestRender();
+	}
+
+	/**
+	 * Handle a raw key event while voice mode may be active. Returns true when
+	 * the key was consumed and should not reach the editor. Mirrors the
+	 * opencode-audio prompt logic (space/ctrl+space + exit-on-typing). We
+	 * also treat Shift+Space as an alias for Ctrl+Space because macOS binds
+	 * Ctrl+Space to "switch input source" by default, and the Shift+Space
+	 * combination is reliably delivered to the terminal.
+	 */
+	private handleVoiceKey(
+		_data: string,
+		keyInfo: { isSpace: boolean; isCtrlSpace: boolean; isShiftSpace: boolean },
+	): boolean {
+		const controller = this.voiceController;
+		if (!controller) return false;
+
+		const isModSpace = keyInfo.isCtrlSpace || keyInfo.isShiftSpace;
+
+		// Voice mode toggle (text-mode -> voice-mode) via ctrl/shift+space when not recording.
+		if (!this.voiceModeEnabled) {
+			if (isModSpace && !controller.isRecording() && !controller.isTranscribing()) {
+				// Only toggle back when the editor is empty so we don't surprise a user mid-type.
+				if (!this.editor.getText()) {
+					this.enterVoiceMode();
+					return true;
+				}
+			}
+			return false;
+		}
+
+		// In voice mode.
+		if (controller.isTranscribing()) {
+			// While transcription is pending, eat space/ctrl+space/shift+space to
+			// avoid re-triggering the voice flow. Everything else (ctrl+d,
+			// ctrl+c, escape, arrows, typing…) is allowed through so the rest of
+			// the app keeps behaving normally.
+			if (keyInfo.isSpace || isModSpace) return true;
+			return false;
+		}
+
+		if (isModSpace) {
+			if (controller.isRecording()) {
+				// Start transcription but flip to text mode *immediately* so the
+				// user can keep typing while the transcription resolves. The
+				// transcript will be prepended in front of anything they type via
+				// handleVoiceFinish.
+				this.beginVoiceSession();
+				controller.finish();
+				this.exitVoiceMode();
+			} else {
+				this.exitVoiceMode();
+			}
+			return true;
+		}
+
+		if (keyInfo.isSpace) {
+			if (controller.isRecording()) {
+				// Pressing space while recording triggers send: capture the
+				// target editor *now* so the async result lands where the user
+				// initiated the voice action.
+				this.beginVoiceSession();
+			}
+			controller.toggle();
+			return true;
+		}
+
+		// Any non-voice key behaves exactly like pressing shift+space first,
+		// then the key itself: finish the in-flight recording (transcribe +
+		// prepend into the editor) and exit voice mode, then let the key
+		// continue on to the editor / app-keybinding handlers so that ctrl+d
+		// (exit), ctrl+c (clear), escape, arrows, typed characters, etc. all
+		// keep working normally.
+		if (controller.isRecording()) {
+			this.beginVoiceSession();
+			controller.finish();
+		}
+		this.exitVoiceMode();
+		return false;
+	}
+
+	/**
+	 * Capture the active editor as the transcription target and install a
+	 * submit interceptor on it. While transcription is pending, any submit
+	 * (enter key, programmatic) is buffered into `voicePendingSubmit`
+	 * instead of being dispatched immediately. When the transcript arrives
+	 * we combine it with the buffered text and dispatch through the editor's
+	 * original onSubmit so nothing the user typed or submitted is lost.
+	 */
+	private beginVoiceSession(): void {
+		const target = this.editor;
+		this.voiceTargetEditor = target;
+		this.voicePendingSubmit = undefined;
+		this.voiceOriginalOnSubmit = target.onSubmit;
+		target.onSubmit = (text: string) => {
+			this.voicePendingSubmit = text;
+		};
+	}
+
+	/**
+	 * Always called when a transcription attempt ends (success, empty,
+	 * error, or cancelled). Drops the captured target editor and restores
+	 * its original onSubmit so the next recording starts clean.
+	 */
+	private finalizeVoiceSession(): void {
+		const target = this.voiceTargetEditor;
+		if (target && this.voiceOriginalOnSubmit !== undefined) {
+			target.onSubmit = this.voiceOriginalOnSubmit;
+		}
+		this.voiceOriginalOnSubmit = undefined;
+		this.voiceTargetEditor = undefined;
+		// Any submit the user attempted during transcription that wasn't
+		// already consumed by handleVoiceResult/handleVoiceFinish is
+		// flushed here so their typed text still reaches the session.
+		const pending = this.voicePendingSubmit;
+		this.voicePendingSubmit = undefined;
+		if (pending !== undefined) {
+			const submit = target?.onSubmit ?? this.defaultEditor.onSubmit;
+			if (submit && pending.trim()) submit(pending);
+		}
+	}
+
+	/**
+	 * Resolve the editor that should receive the transcript. Prefers the
+	 * editor captured when the voice session began (so an editor swap mid
+	 * transcription doesn't misroute the result), falling back to the
+	 * currently focused editor.
+	 */
+	private getVoiceTargetEditor(): EditorComponent {
+		return this.voiceTargetEditor ?? this.editor;
+	}
+
+	private handleVoiceResult(text: string): void {
+		const trimmed = text.trim();
+		if (!trimmed) return;
+
+		// Always dispatch through the *original* onSubmit — `target.onSubmit`
+		// is still the buffering interceptor installed by beginVoiceSession();
+		// it will be restored in finalizeVoiceSession() right after this.
+		const submit = this.voiceOriginalOnSubmit ?? this.defaultEditor.onSubmit;
+		if (!submit) return;
+
+		// If the user also typed + pressed enter during transcription, the
+		// text is buffered in voicePendingSubmit. Combine it with the
+		// transcript so nothing is dropped. The in-flight editor's text is
+		// already cleared (onSubmit was called on it), so we don't touch it.
+		const pending = this.voicePendingSubmit;
+		this.voicePendingSubmit = undefined;
+		const combined = pending?.trim() ? `${trimmed} ${pending}` : trimmed;
+		submit(combined);
+	}
+
+	private handleVoiceFinish(text: string): void {
+		const target = this.getVoiceTargetEditor();
+		this.exitVoiceMode();
+		const trimmed = text.trim();
+
+		// If the user typed + pressed enter during transcription, the editor
+		// was cleared by submitValue and the attempted submit is sitting in
+		// voicePendingSubmit. Combine the transcript with that text and
+		// dispatch the *original* onSubmit so the message gets sent with
+		// everything the user intended.
+		const pending = this.voicePendingSubmit;
+		if (pending !== undefined) {
+			this.voicePendingSubmit = undefined;
+			const submit = this.voiceOriginalOnSubmit ?? this.defaultEditor.onSubmit;
+			if (submit) {
+				const sep = pending.startsWith(" ") || pending.startsWith("\n") || !pending ? "" : " ";
+				const combined = trimmed ? `${trimmed}${sep}${pending}` : pending;
+				if (combined.trim()) submit(combined);
+			}
+			this.ui.requestRender();
+			return;
+		}
+
+		if (!trimmed) {
+			this.ui.requestRender();
+			return;
+		}
+
+		const current = target.getText();
+		if (!current) {
+			// Empty editor: just set the text. Cursor naturally lands at the end,
+			// which is exactly what the user wants.
+			target.setText(trimmed);
+			this.ui.requestRender();
+			return;
+		}
+
+		// User typed something while transcription was in flight. Prepend the
+		// transcript in front of their text, separated by a space if needed, and
+		// keep the cursor anchored on their content so they can keep typing.
+		const sep = current.startsWith(" ") || current.startsWith("\n") ? "" : " ";
+		const prefix = `${trimmed}${sep}`;
+		if (target.prependText) {
+			target.prependText(prefix);
+		} else {
+			// Fallback for custom editors without prependText: best-effort using
+			// setText (cursor jumps to the end).
+			target.setText(prefix + current);
+		}
+		this.ui.requestRender();
 	}
 
 	// =========================================================================

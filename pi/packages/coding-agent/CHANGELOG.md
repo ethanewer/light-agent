@@ -2,6 +2,10 @@
 
 ## [Unreleased]
 
+### Added
+
+- Added voice input in the interactive TUI. Press space to start/stop recording and send the transcript, shift+space to transcribe in-flight audio into the editor without sending, and `/voice` to re-enter voice mode from text input. Recording uses `ffmpeg` (or `sox`'s `rec`) and transcription uses OpenAI's `/v1/audio/transcriptions` endpoint via the configured `openai` provider credentials and base URL.
+
 ## [0.67.68] - 2026-04-17
 
 ## [0.67.67] - 2026-04-17
