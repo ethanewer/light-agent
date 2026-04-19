@@ -46,6 +46,7 @@ import { createToolHtmlRenderer } from "./export-html/tool-renderer.js";
 import {
 	type ContextUsage,
 	type ExtensionCommandContextActions,
+	type ExtensionContext,
 	type ExtensionErrorListener,
 	ExtensionRunner,
 	type ExtensionUIContext,
@@ -79,6 +80,7 @@ import { createSyntheticSourceInfo, type SourceInfo } from "./source-info.js";
 import { buildSystemPrompt } from "./system-prompt.js";
 import { type BashOperations, createLocalBashOperations } from "./tools/bash.js";
 import { createAllToolDefinitions } from "./tools/index.js";
+import { buildReadToolDescription } from "./tools/read.js";
 import { createToolDefinitionFromAgentTool, wrapToolDefinition } from "./tools/tool-definition-wrapper.js";
 
 // ============================================================================
@@ -1404,8 +1406,14 @@ export class AgentSession {
 
 		// Re-clamp thinking level for new model's capabilities
 		this.setThinkingLevel(thinkingLevel);
+		this._refreshBuiltInToolDefinitionsForCurrentModel();
 
 		await this._emitModelSelect(model, previousModel, "set");
+	}
+
+	refreshModelRegistryState(): void {
+		this._modelRegistry.refresh();
+		this._handleProviderRegistryChange();
 	}
 
 	/**
@@ -1444,6 +1452,7 @@ export class AgentSession {
 		// - Undefined scoped model thinking level inherits the current session preference
 		// setThinkingLevel clamps to model capabilities.
 		this.setThinkingLevel(thinkingLevel);
+		this._refreshBuiltInToolDefinitionsForCurrentModel();
 
 		await this._emitModelSelect(next.model, currentModel, "cycle");
 
@@ -1469,6 +1478,7 @@ export class AgentSession {
 
 		// Re-clamp thinking level for new model's capabilities
 		this.setThinkingLevel(thinkingLevel);
+		this._refreshBuiltInToolDefinitionsForCurrentModel();
 
 		await this._emitModelSelect(nextModel, currentModel, "cycle");
 
@@ -2120,6 +2130,11 @@ export class AgentSession {
 		this.agent.state.model = refreshedModel;
 	}
 
+	private _handleProviderRegistryChange(): void {
+		this._refreshCurrentModelFromRegistry();
+		this._refreshBuiltInToolDefinitionsForCurrentModel();
+	}
+
 	private _bindExtensionCore(runner: ExtensionRunner): void {
 		const getCommands = (): SlashCommandInfo[] => {
 			const extensionCommands: SlashCommandInfo[] = runner.getRegisteredCommands().map((command) => ({
@@ -2217,14 +2232,72 @@ export class AgentSession {
 			{
 				registerProvider: (name, config) => {
 					this._modelRegistry.registerProvider(name, config);
-					this._refreshCurrentModelFromRegistry();
+					this._handleProviderRegistryChange();
 				},
 				unregisterProvider: (name) => {
 					this._modelRegistry.unregisterProvider(name);
-					this._refreshCurrentModelFromRegistry();
+					this._handleProviderRegistryChange();
 				},
 			},
 		);
+	}
+
+	private _createBuiltInToolContext(): ExtensionContext {
+		return {
+			ui: {
+				select: async () => undefined,
+				confirm: async () => false,
+				input: async () => undefined,
+				notify: () => {},
+				onTerminalInput: () => () => {},
+				setStatus: () => {},
+				setWorkingMessage: () => {},
+				setHiddenThinkingLabel: () => {},
+				setWidget: () => {},
+				setFooter: () => {},
+				setHeader: () => {},
+				setTitle: () => {},
+				custom: async () => undefined as never,
+				pasteToEditor: () => {},
+				setEditorText: () => {},
+				getEditorText: () => "",
+				editor: async () => undefined,
+				setEditorComponent: () => {},
+				get theme() {
+					return theme;
+				},
+				getAllThemes: () => [],
+				getTheme: () => undefined,
+				setTheme: (_theme: string | typeof theme) => ({ success: false, error: "UI not available" }),
+				getToolsExpanded: () => false,
+				setToolsExpanded: () => {},
+			},
+			hasUI: false,
+			cwd: this._cwd,
+			sessionManager: this.sessionManager,
+			modelRegistry: this._modelRegistry,
+			model: this.model,
+			isIdle: () => !this.isStreaming,
+			signal: this.agent.signal,
+			abort: () => this.abort(),
+			hasPendingMessages: () => this.pendingMessageCount > 0,
+			shutdown: () => {
+				this._extensionShutdownHandler?.();
+			},
+			getContextUsage: () => this.getContextUsage(),
+			compact: (options) => {
+				void (async () => {
+					try {
+						const result = await this.compact(options?.customInstructions);
+						options?.onComplete?.(result);
+					} catch (error) {
+						const err = error instanceof Error ? error : new Error(String(error));
+						options?.onError?.(err);
+					}
+				})();
+			},
+			getSystemPrompt: () => this.systemPrompt,
+		};
 	}
 
 	private _refreshToolRegistry(options?: { activeToolNames?: string[]; includeAllExtensionTools?: boolean }): void {
@@ -2278,7 +2351,10 @@ export class AgentSession {
 		const toolRegistry = new Map(
 			Array.from(this._baseToolDefinitions.values()).map((definition) => [
 				definition.name,
-				wrapToolDefinition(definition),
+				wrapToolDefinition(
+					definition,
+					() => this._extensionRunner?.createContext() ?? this._createBuiltInToolContext(),
+				),
 			]),
 		);
 		for (const tool of wrappedExtensionTools as AgentTool[]) {
@@ -2305,6 +2381,40 @@ export class AgentSession {
 		this.setActiveToolsByName([...new Set(nextActiveToolNames)]);
 	}
 
+	private _refreshBuiltInToolDefinitionsForCurrentModel(): void {
+		if (this._baseToolsOverride) {
+			return;
+		}
+
+		// Skip rebuild when the read-tool description wouldn't change. This keeps this a
+		// no-op for image-capable models where nothing else in the built-in toolset is
+		// model-dependent.
+		const nextReadDescription = buildReadToolDescription({
+			currentModel: this.model,
+			modelRegistry: this._modelRegistry,
+		});
+		const currentRead = this._baseToolDefinitions.get("read");
+		if (currentRead && currentRead.description === nextReadDescription) {
+			return;
+		}
+
+		const autoResizeImages = this.settingsManager.getImageAutoResize();
+		const shellCommandPrefix = this.settingsManager.getShellCommandPrefix();
+		const baseToolDefinitions = createAllToolDefinitions(this._cwd, {
+			read: {
+				autoResizeImages,
+				currentModel: this.model,
+				modelRegistry: this._modelRegistry,
+			},
+			bash: { commandPrefix: shellCommandPrefix },
+		});
+
+		this._baseToolDefinitions = new Map(
+			Object.entries(baseToolDefinitions).map(([name, tool]) => [name, tool as ToolDefinition]),
+		);
+		this._refreshToolRegistry();
+	}
+
 	private _buildRuntime(options: {
 		activeToolNames?: string[];
 		flagValues?: Map<string, boolean | string>;
@@ -2320,7 +2430,11 @@ export class AgentSession {
 					]),
 				)
 			: createAllToolDefinitions(this._cwd, {
-					read: { autoResizeImages },
+					read: {
+						autoResizeImages,
+						currentModel: this.model,
+						modelRegistry: this._modelRegistry,
+					},
 					bash: { commandPrefix: shellCommandPrefix },
 				});
 

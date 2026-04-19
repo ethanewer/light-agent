@@ -1,5 +1,5 @@
 import type { AgentTool } from "@mariozechner/pi-agent-core";
-import type { ImageContent, TextContent } from "@mariozechner/pi-ai";
+import type { Api, ImageContent, Model, TextContent } from "@mariozechner/pi-ai";
 import { Text } from "@mariozechner/pi-tui";
 import { type Static, Type } from "@sinclair/typebox";
 import { constants } from "fs";
@@ -8,11 +8,18 @@ import { keyHint } from "../../modes/interactive/components/keybinding-hints.js"
 import { getLanguageFromPath, highlightCode } from "../../modes/interactive/theme/theme.js";
 import { formatDimensionNote, resizeImage } from "../../utils/image-resize.js";
 import { detectSupportedImageMimeTypeFromFile } from "../../utils/mime.js";
-import type { ToolDefinition, ToolRenderResultOptions } from "../extensions/types.js";
+import type { ExtensionContext, ToolDefinition, ToolRenderResultOptions } from "../extensions/types.js";
+import type { ModelRegistry } from "../model-registry.js";
 import { resolveReadPath } from "./path-utils.js";
 import { getTextOutput, invalidArgText, replaceTabs, shortenPath, str } from "./render-utils.js";
 import { wrapToolDefinition } from "./tool-definition-wrapper.js";
 import { DEFAULT_MAX_BYTES, DEFAULT_MAX_LINES, formatSize, type TruncationResult, truncateHead } from "./truncate.js";
+import {
+	describeImageFallback,
+	hasConfiguredVisionFallback,
+	supportsImageInput,
+	VISION_FALLBACK_MODEL_LABEL,
+} from "./vision-fallback.js";
 
 const readSchema = Type.Object({
 	path: Type.String({ description: "Path to the file to read (relative or absolute)" }),
@@ -50,6 +57,23 @@ export interface ReadToolOptions {
 	autoResizeImages?: boolean;
 	/** Custom operations for file reading. Default: local filesystem */
 	operations?: ReadOperations;
+	/** Current model used to tailor the tool description. */
+	currentModel?: Model<Api>;
+	/** Model registry used to detect fallback-model availability. */
+	modelRegistry?: ModelRegistry;
+}
+
+/** Description string the read tool would expose for the given model/registry. Exported so callers can detect whether a rebuild is a no-op. */
+export function buildReadToolDescription(options?: ReadToolOptions): string {
+	const hasCurrentModel = options?.currentModel !== undefined;
+	if (hasCurrentModel && !supportsImageInput(options?.currentModel)) {
+		if (hasConfiguredVisionFallback(options?.modelRegistry)) {
+			return `Read the contents of a file. Supports text files. For image files (jpg, png, gif, webp), a text description of the image is returned. For text files, output is truncated to ${DEFAULT_MAX_LINES} lines or ${DEFAULT_MAX_BYTES / 1024}KB (whichever is hit first). Use offset/limit for large files. When you need the full file, continue with offset until complete.`;
+		}
+		return `Read the contents of a file. Supports text files. For text files, output is truncated to ${DEFAULT_MAX_LINES} lines or ${DEFAULT_MAX_BYTES / 1024}KB (whichever is hit first). Use offset/limit for large files. When you need the full file, continue with offset until complete.`;
+	}
+
+	return `Read the contents of a file. Supports text files and images (jpg, png, gif, webp). Images are sent as attachments. For text files, output is truncated to ${DEFAULT_MAX_LINES} lines or ${DEFAULT_MAX_BYTES / 1024}KB (whichever is hit first). Use offset/limit for large files. When you need the full file, continue with offset until complete.`;
 }
 
 function formatReadCall(
@@ -120,7 +144,7 @@ export function createReadToolDefinition(
 	return {
 		name: "read",
 		label: "read",
-		description: `Read the contents of a file. Supports text files and images (jpg, png, gif, webp). Images are sent as attachments. For text files, output is truncated to ${DEFAULT_MAX_LINES} lines or ${DEFAULT_MAX_BYTES / 1024}KB (whichever is hit first). Use offset/limit for large files. When you need the full file, continue with offset until complete.`,
+		description: buildReadToolDescription(options),
 		promptSnippet: "Read file contents",
 		promptGuidelines: ["Use read to examine files instead of cat or sed."],
 		parameters: readSchema,
@@ -157,6 +181,8 @@ export function createReadToolDefinition(
 								// Read image as binary.
 								const buffer = await ops.readFile(absolutePath);
 								const base64 = buffer.toString("base64");
+								let textNote: string;
+								let imageContent: ImageContent;
 								if (autoResizeImages) {
 									// Resize image if needed before sending it back to the model.
 									const resized = await resizeImage({ type: "image", data: base64, mimeType });
@@ -167,19 +193,40 @@ export function createReadToolDefinition(
 												text: `Read image file [${mimeType}]\n[Image omitted: could not be resized below the inline image size limit.]`,
 											},
 										];
-									} else {
-										const dimensionNote = formatDimensionNote(resized);
-										let textNote = `Read image file [${resized.mimeType}]`;
-										if (dimensionNote) textNote += `\n${dimensionNote}`;
-										content = [
-											{ type: "text", text: textNote },
-											{ type: "image", data: resized.data, mimeType: resized.mimeType },
-										];
+										if (aborted) return;
+										signal?.removeEventListener("abort", onAbort);
+										resolve({ content, details });
+										return;
 									}
+									const dimensionNote = formatDimensionNote(resized);
+									textNote = `Read image file [${resized.mimeType}]`;
+									if (dimensionNote) textNote += `\n${dimensionNote}`;
+									imageContent = { type: "image", data: resized.data, mimeType: resized.mimeType };
+								} else {
+									textNote = `Read image file [${mimeType}]`;
+									imageContent = { type: "image", data: base64, mimeType };
+								}
+
+								const modelSupportsImages = !_ctx || supportsImageInput(_ctx.model);
+								if (modelSupportsImages) {
+									content = [{ type: "text", text: textNote }, imageContent];
+								} else if (_ctx && hasConfiguredVisionFallback(_ctx.modelRegistry)) {
+									const description = await describeImageFallback(_ctx, imageContent, absolutePath, signal);
+									content = [
+										{
+											type: "text",
+											text:
+												`${textNote}\n` +
+												`[Image analyzed with ${VISION_FALLBACK_MODEL_LABEL} because the active model does not support image input.]\n\n` +
+												description,
+										},
+									];
 								} else {
 									content = [
-										{ type: "text", text: `Read image file [${mimeType}]` },
-										{ type: "image", data: base64, mimeType },
+										{
+											type: "text",
+											text: `${textNote}\n[Image omitted: no vision-capable model path is configured.]`,
+										},
 									];
 								}
 							} else {
@@ -260,8 +307,32 @@ export function createReadToolDefinition(
 	};
 }
 
+function createReadToolExecutionContext(cwd: string, options?: ReadToolOptions): (() => ExtensionContext) | undefined {
+	if (!options?.currentModel) {
+		return undefined;
+	}
+
+	const modelRegistry =
+		options?.modelRegistry ??
+		({
+			find: () => undefined,
+			hasConfiguredAuth: () => false,
+			getApiKeyAndHeaders: async () => ({ ok: false, error: "No model registry configured." }),
+		} as unknown as ModelRegistry);
+
+	// Read only consumes `model`, `modelRegistry`, and `signal`. The rest of ExtensionContext is
+	// intentionally stubbed so standalone callers don't need to spin up a SessionManager.
+	const stub: Partial<ExtensionContext> = {
+		cwd,
+		modelRegistry,
+		model: options?.currentModel,
+		signal: undefined,
+	};
+	return () => stub as ExtensionContext;
+}
+
 export function createReadTool(cwd: string, options?: ReadToolOptions): AgentTool<typeof readSchema> {
-	return wrapToolDefinition(createReadToolDefinition(cwd, options));
+	return wrapToolDefinition(createReadToolDefinition(cwd, options), createReadToolExecutionContext(cwd, options));
 }
 
 /** Default read tool using process.cwd() for backwards compatibility. */
