@@ -307,12 +307,14 @@ class PiBenchAgent(HarborBaseAgent):  # type: ignore[misc]
             extra_args = " " + " ".join(shlex.quote(arg) for arg in shlex.split(self.extra_args))
         command = (
             f"cat <<'EOF' >{log_file}\n{config_block}\nEOF\n"
+            # Stream pi events into both {event_log} and {log_file} as they are produced so
+            # that a hard agent timeout (e.g. compile-compcert) still leaves a useful log
+            # behind in the artifact copy.
             f"{binary} --mode json --no-session --no-context-files --no-extensions --no-skills "
             f"--no-prompt-templates --no-themes --tools {shlex.quote(self.tools)} --thinking {shlex.quote(self.thinking)} "
             f"--model {shlex.quote(self.model)}{prompt_flag}{append_flag}{extra_args} "
-            f"{shlex.quote(instruction)} >{event_log} 2>{debug_log}; "
-            "PI_EXIT=$?; "
-            f"cat {event_log} >> {log_file} 2>/dev/null; "
+            f"{shlex.quote(instruction)} 2>{debug_log} | tee -a {log_file} > {event_log}; "
+            "PI_EXIT=${PIPESTATUS[0]}; "
             f"echo '' >> {log_file}; "
             f"echo '=== STDERR/DEBUG LOG ===' >> {log_file}; "
             f"cat {debug_log} >> {log_file} 2>/dev/null; "
