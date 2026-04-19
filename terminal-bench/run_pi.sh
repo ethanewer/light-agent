@@ -33,6 +33,7 @@ JOBS_DIR="${SCRIPT_DIR}/jobs"
 RESULTS_DIR="${REPO_ROOT}/results"
 
 export PI_BENCH_THINKING="${THINKING}"
+export PI_BENCH_MODEL="${MODEL}"
 export PI_BENCH_TOOLS="${TOOLS}"
 export PI_BENCH_SYSTEM_PROMPT="${SYSTEM_PROMPT}"
 export PI_BENCH_EXTRA_ARGS="${EXTRA_ARGS}"
@@ -70,8 +71,41 @@ resolve_harbor() {
   exit 127
 }
 
+validate_extra_args() {
+  if [[ -z "${PI_BENCH_EXTRA_ARGS}" ]]; then
+    return
+  fi
+
+  python3 - "${PI_BENCH_EXTRA_ARGS}" <<'PY'
+import shlex
+import sys
+
+forbidden = {
+    "--model",
+    "--thinking",
+    "--tools",
+    "--no-tools",
+    "--system-prompt",
+    "--append-system-prompt",
+    "--provider",
+    "--mode",
+    "--print",
+    "-p",
+}
+
+tokens = shlex.split(sys.argv[1])
+for token in tokens:
+    flag = token.split("=", 1)[0]
+    if flag in forbidden:
+        print(f"ERROR: PI_BENCH_EXTRA_ARGS may not override benchmark-controlled flag {flag}.", file=sys.stderr)
+        sys.exit(1)
+PY
+}
+
 main() {
   resolve_harbor
+  validate_extra_args
+  node "${SCRIPT_DIR}/validate_pi_bench_config.mjs" >/dev/null
 
   CMD=(
     "${HARBOR_CMD[@]}"

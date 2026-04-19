@@ -17,6 +17,7 @@ import { SessionManager } from "./session-manager.js";
 export interface CreateAgentSessionRuntimeResult extends CreateAgentSessionResult {
 	services: AgentSessionServices;
 	diagnostics: AgentSessionRuntimeDiagnostic[];
+	toolNames?: string[];
 }
 
 /**
@@ -71,6 +72,7 @@ export class AgentSessionRuntime {
 		private readonly createRuntime: CreateAgentSessionRuntimeFactory,
 		private _diagnostics: AgentSessionRuntimeDiagnostic[] = [],
 		private _modelFallbackMessage?: string,
+		private _toolNames: string[] = [],
 	) {}
 
 	get services(): AgentSessionServices {
@@ -91,6 +93,10 @@ export class AgentSessionRuntime {
 
 	get modelFallbackMessage(): string | undefined {
 		return this._modelFallbackMessage;
+	}
+
+	get toolNames(): readonly string[] {
+		return this._toolNames;
 	}
 
 	private async emitBeforeSwitch(
@@ -136,6 +142,7 @@ export class AgentSessionRuntime {
 		this._services = result.services;
 		this._diagnostics = result.diagnostics;
 		this._modelFallbackMessage = result.modelFallbackMessage;
+		this._toolNames = result.toolNames ?? [];
 	}
 
 	async switchSession(sessionPath: string, cwdOverride?: string): Promise<{ cancelled: boolean }> {

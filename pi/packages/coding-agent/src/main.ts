@@ -93,6 +93,10 @@ function isTruthyEnvFlag(value: string | undefined): boolean {
 	return value === "1" || value.toLowerCase() === "true" || value.toLowerCase() === "yes";
 }
 
+function getDefaultToolNames(): string[] {
+	return ["read", "bash", "edit", "write"];
+}
+
 type AppMode = "interactive" | "print" | "json" | "rpc";
 
 function resolveAppMode(parsed: Args, stdinIsTTY: boolean): AppMode {
@@ -292,12 +296,14 @@ function buildSessionOptions(
 	settingsManager: SettingsManager,
 ): {
 	options: CreateAgentSessionOptions;
+	toolNames: string[];
 	cliThinkingFromModel: boolean;
 	diagnostics: AgentSessionRuntimeDiagnostic[];
 } {
 	const options: CreateAgentSessionOptions = {};
 	const diagnostics: AgentSessionRuntimeDiagnostic[] = [];
 	let cliThinkingFromModel = false;
+	let toolNames = getDefaultToolNames();
 
 	// Model from CLI
 	// - supports --provider <name> --model <pattern>
@@ -371,14 +377,17 @@ function buildSessionOptions(
 		// --tools can still add specific ones back
 		if (parsed.tools && parsed.tools.length > 0) {
 			options.tools = parsed.tools.map((name) => allTools[name]);
+			toolNames = [...parsed.tools];
 		} else {
 			options.tools = [];
+			toolNames = [];
 		}
 	} else if (parsed.tools) {
 		options.tools = parsed.tools.map((name) => allTools[name]);
+		toolNames = [...parsed.tools];
 	}
 
-	return { options, cliThinkingFromModel, diagnostics };
+	return { options, toolNames, cliThinkingFromModel, diagnostics };
 }
 
 function resolveCliPaths(cwd: string, paths: string[] | undefined): string[] | undefined {
@@ -559,6 +568,7 @@ export async function main(args: string[], options?: MainOptions) {
 			modelPatterns && modelPatterns.length > 0 ? await resolveModelScope(modelPatterns, modelRegistry) : [];
 		const {
 			options: sessionOptions,
+			toolNames,
 			cliThinkingFromModel,
 			diagnostics: sessionOptionDiagnostics,
 		} = buildSessionOptions(
@@ -607,6 +617,7 @@ export async function main(args: string[], options?: MainOptions) {
 		return {
 			...created,
 			services,
+			toolNames,
 			diagnostics,
 		};
 	};
@@ -674,9 +685,19 @@ export async function main(args: string[], options?: MainOptions) {
 	}
 
 	const startupBenchmark = isTruthyEnvFlag(process.env.PI_STARTUP_BENCHMARK);
+	const logRuntimeConfig = isTruthyEnvFlag(process.env.PI_LOG_RUNTIME_CONFIG);
 	if (startupBenchmark && appMode !== "interactive") {
 		console.error(chalk.red("Error: PI_STARTUP_BENCHMARK only supports interactive mode"));
 		process.exit(1);
+	}
+
+	if (logRuntimeConfig && appMode !== "interactive" && session.model) {
+		const resolvedModel = `${session.model.provider}/${session.model.id}`;
+		const activeTools = session.getActiveToolNames();
+		const resolvedTools = activeTools.length > 0 ? activeTools.join(",") : "<none>";
+		console.error(
+			`PI_RUNTIME_CONFIG model=${resolvedModel} thinking=${session.thinkingLevel} tools=${resolvedTools}`,
+		);
 	}
 
 	if (appMode === "rpc") {

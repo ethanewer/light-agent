@@ -121,6 +121,7 @@ def _set_result(
     exit_code: int,
     stdout: str,
     stderr: str,
+    config: dict[str, Any] | None = None,
 ) -> None:
     _safe_set(context, "success", success)
     _safe_set(context, "exit_code", exit_code)
@@ -136,6 +137,7 @@ def _set_result(
             "exit_code": exit_code,
             "stdout": stdout,
             "stderr": stderr,
+            "config": config or {},
         }
 
 
@@ -231,7 +233,20 @@ class PiBenchAgent(HarborBaseAgent):  # type: ignore[misc]
     ) -> None:
         instruction = instruction.strip()
         if not instruction:
-            _set_result(context, success=False, exit_code=1, stdout="", stderr="Empty instruction.")
+            _set_result(
+                context,
+                success=False,
+                exit_code=1,
+                stdout="",
+                stderr="Empty instruction.",
+                config={
+                    "model": self.model,
+                    "thinking": self.thinking,
+                    "tools": self.tools,
+                    "system_prompt_provided": bool(self.system_prompt),
+                    "extra_args": self.extra_args,
+                },
+            )
             return
 
         env: dict[str, str] = {}
@@ -239,19 +254,32 @@ class PiBenchAgent(HarborBaseAgent):  # type: ignore[misc]
             value = os.environ.get(key)
             if value:
                 env[key] = value
+        env["PI_LOG_RUNTIME_CONFIG"] = "1"
 
         binary = getattr(self, "_remote_binary", f"{_REMOTE_BUNDLE_DIR}/pi-linux-arm64")
         log_file = "/tmp/pi-output.log"
         debug_log = "/tmp/pi-debug.log"
+        config_block = "\n".join(
+            [
+                "=== PI BENCH CONFIG ===",
+                f"model={self.model}",
+                f"thinking={self.thinking}",
+                f"tools={self.tools}",
+                f"system_prompt_provided={'yes' if self.system_prompt else 'no'}",
+                f"extra_args={self.extra_args or '<none>'}",
+                "=== PI OUTPUT ===",
+            ]
+        )
         prompt_flag = f" --system-prompt {shlex.quote(self.system_prompt)}" if self.system_prompt else ""
         extra_args = ""
         if self.extra_args.strip():
             extra_args = " " + " ".join(shlex.quote(arg) for arg in shlex.split(self.extra_args))
         command = (
+            f"cat <<'EOF' >{log_file}\n{config_block}\nEOF\n"
             f"{binary} --print --no-session --no-context-files --no-extensions --no-skills "
             f"--no-prompt-templates --no-themes --tools {shlex.quote(self.tools)} --thinking {shlex.quote(self.thinking)} "
             f"--model {shlex.quote(self.model)}{prompt_flag}{extra_args} "
-            f"{shlex.quote(instruction)} >{log_file} 2>{debug_log}; "
+            f"{shlex.quote(instruction)} >>{log_file} 2>{debug_log}; "
             "PI_EXIT=$?; "
             f"echo '' >> {log_file}; "
             f"echo '=== STDERR/DEBUG LOG ===' >> {log_file}; "
@@ -274,4 +302,11 @@ class PiBenchAgent(HarborBaseAgent):  # type: ignore[misc]
             exit_code=exit_code,
             stdout=stdout,
             stderr=stderr,
+            config={
+                "model": self.model,
+                "thinking": self.thinking,
+                "tools": self.tools,
+                "system_prompt_provided": bool(self.system_prompt),
+                "extra_args": self.extra_args,
+            },
         )
