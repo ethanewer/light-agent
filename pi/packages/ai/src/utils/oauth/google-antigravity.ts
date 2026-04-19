@@ -7,10 +7,7 @@
  */
 
 import type { Server } from "node:http";
-import {
-	ANTIGRAVITY_CLIENT_ID_B64,
-	ANTIGRAVITY_CLIENT_SECRET_B64,
-} from "./google-oauth-secrets.js";
+import { ANTIGRAVITY_CLIENT_ID_B64, ANTIGRAVITY_CLIENT_SECRET_B64 } from "./google-oauth-secrets.js";
 import { oauthErrorHtml, oauthSuccessHtml } from "./oauth-page.js";
 import { generatePKCE } from "./pkce.js";
 import type { OAuthCredentials, OAuthLoginCallbacks, OAuthProviderInterface } from "./types.js";
@@ -30,11 +27,8 @@ if (typeof process !== "undefined" && (process.versions?.node || process.version
 // Antigravity OAuth credentials (different from Gemini CLI).
 // Values are loaded from the gitignored google-oauth-secrets.ts or env vars.
 const decode = (s: string) => (s ? atob(s) : "");
-const CLIENT_ID =
-	process.env.GOOGLE_ANTIGRAVITY_CLIENT_ID ?? decode(ANTIGRAVITY_CLIENT_ID_B64);
-const CLIENT_SECRET =
-	process.env.GOOGLE_ANTIGRAVITY_CLIENT_SECRET ??
-	decode(ANTIGRAVITY_CLIENT_SECRET_B64);
+const CLIENT_ID = process.env.GOOGLE_ANTIGRAVITY_CLIENT_ID ?? decode(ANTIGRAVITY_CLIENT_ID_B64);
+const CLIENT_SECRET = process.env.GOOGLE_ANTIGRAVITY_CLIENT_SECRET ?? decode(ANTIGRAVITY_CLIENT_SECRET_B64);
 const REDIRECT_URI = "http://localhost:51121/oauth-callback";
 
 // Antigravity requires additional scopes

@@ -5,6 +5,7 @@
 ### Added
 
 - Added voice input in the interactive TUI. Press space to start/stop recording and send the transcript, shift+space to transcribe in-flight audio into the editor without sending, and `/voice` to re-enter voice mode from text input. Recording uses `ffmpeg` (or `sox`'s `rec`) and transcription uses OpenAI's `/v1/audio/transcriptions` endpoint via the configured `openai` provider credentials and base URL.
+- Added a vision fallback for the `read` tool so agents running on text-only models can still consume image files. When the active model lacks image input but an OpenRouter auth is configured, image reads are routed through `openrouter/qwen/qwen3.6-plus` for a text description (prefixed with an `[Image analyzed with …]` note), with results cached per session keyed by `(path, mtime, size)`.
 
 ## [0.67.68] - 2026-04-17
 

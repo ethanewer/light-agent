@@ -7,10 +7,7 @@
  */
 
 import type { Server } from "node:http";
-import {
-	GEMINI_CLI_CLIENT_ID_B64,
-	GEMINI_CLI_CLIENT_SECRET_B64,
-} from "./google-oauth-secrets.js";
+import { GEMINI_CLI_CLIENT_ID_B64, GEMINI_CLI_CLIENT_SECRET_B64 } from "./google-oauth-secrets.js";
 import { oauthErrorHtml, oauthSuccessHtml } from "./oauth-page.js";
 import { generatePKCE } from "./pkce.js";
 import type { OAuthCredentials, OAuthLoginCallbacks, OAuthProviderInterface } from "./types.js";
@@ -28,11 +25,8 @@ if (typeof process !== "undefined" && (process.versions?.node || process.version
 }
 
 const decode = (s: string) => (s ? atob(s) : "");
-const CLIENT_ID =
-	process.env.GOOGLE_GEMINI_CLI_CLIENT_ID ?? decode(GEMINI_CLI_CLIENT_ID_B64);
-const CLIENT_SECRET =
-	process.env.GOOGLE_GEMINI_CLI_CLIENT_SECRET ??
-	decode(GEMINI_CLI_CLIENT_SECRET_B64);
+const CLIENT_ID = process.env.GOOGLE_GEMINI_CLI_CLIENT_ID ?? decode(GEMINI_CLI_CLIENT_ID_B64);
+const CLIENT_SECRET = process.env.GOOGLE_GEMINI_CLI_CLIENT_SECRET ?? decode(GEMINI_CLI_CLIENT_SECRET_B64);
 const REDIRECT_URI = "http://localhost:8085/oauth2callback";
 const SCOPES = [
 	"https://www.googleapis.com/auth/cloud-platform",
