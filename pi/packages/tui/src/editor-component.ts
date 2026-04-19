@@ -47,6 +47,13 @@ export interface EditorComponent extends Component {
 	insertTextAtCursor?(text: string): void;
 
 	/**
+	 * Prepend text at the very beginning of the buffer, shifting the cursor
+	 * forward so it still points at the same user content. No-op on empty
+	 * input.
+	 */
+	prependText?(text: string): void;
+
+	/**
 	 * Get text with any markers expanded (e.g., paste markers).
 	 * Falls back to getText() if not implemented.
 	 */

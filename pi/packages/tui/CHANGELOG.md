@@ -2,6 +2,10 @@
 
 ## [Unreleased]
 
+### Added
+
+- Added `Editor.prependText()` (and corresponding optional `prependText?` on the `EditorComponent` interface) for inserting text at the start of the buffer as a single undoable step, shifting the cursor forward so it stays on the same user content.
+
 ## [0.67.68] - 2026-04-17
 
 ## [0.67.67] - 2026-04-17

@@ -963,6 +963,61 @@ export class Editor implements Component, Focusable {
 	}
 
 	/**
+	 * Insert text at the very beginning of the buffer, keeping the user's
+	 * cursor on the same content (i.e. shift the cursor forward so it still
+	 * points at the character it did before the prepend). Multi-line
+	 * prepends shift the cursor down by the number of inserted newlines.
+	 *
+	 * Atomic for undo — a single undo reverses the entire prepend.
+	 */
+	prependText(text: string): void {
+		if (!text) return;
+		this.cancelAutocomplete();
+		this.pushUndoSnapshot();
+		this.lastAction = null;
+		this.historyIndex = -1;
+
+		const normalized = this.normalizeText(text);
+		const insertedLines = normalized.split("\n");
+		const addedLineCount = insertedLines.length - 1;
+		const lastInsertedLineLength = (insertedLines[insertedLines.length - 1] ?? "").length;
+
+		const prevLine = this.state.cursorLine;
+		const prevCol = this.state.cursorCol;
+
+		if (insertedLines.length === 1) {
+			// Single-line prepend: prefix sits in front of line 0 only.
+			this.state.lines[0] = normalized + (this.state.lines[0] ?? "");
+			if (prevLine === 0) {
+				this.setCursorCol(prevCol + normalized.length);
+			}
+			// Cursors on later lines are unchanged.
+		} else {
+			// Multi-line prepend. The last inserted line is merged onto the
+			// front of the old line 0; the lines before it are new.
+			const oldFirstLine = this.state.lines[0] ?? "";
+			this.state.lines = [
+				...insertedLines.slice(0, -1),
+				(insertedLines[insertedLines.length - 1] ?? "") + oldFirstLine,
+				...this.state.lines.slice(1),
+			];
+
+			if (prevLine === 0) {
+				this.state.cursorLine = addedLineCount;
+				this.setCursorCol(lastInsertedLineLength + prevCol);
+			} else {
+				this.state.cursorLine = prevLine + addedLineCount;
+				// Column on subsequent lines is unchanged.
+				this.setCursorCol(prevCol);
+			}
+		}
+
+		if (this.onChange) {
+			this.onChange(this.getText());
+		}
+	}
+
+	/**
 	 * Normalize text for editor storage:
 	 * - Normalize line endings (\r\n and \r -> \n)
 	 * - Expand tabs to 4 spaces

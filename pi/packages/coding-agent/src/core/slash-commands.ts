@@ -34,5 +34,6 @@ export const BUILTIN_SLASH_COMMANDS: ReadonlyArray<BuiltinSlashCommand> = [
 	{ name: "compact", description: "Manually compact the session context" },
 	{ name: "resume", description: "Resume a different session" },
 	{ name: "reload", description: "Reload keybindings, extensions, skills, prompts, and themes" },
+	{ name: "voice", description: "Re-enter voice input mode" },
 	{ name: "quit", description: "Quit pi" },
 ];
