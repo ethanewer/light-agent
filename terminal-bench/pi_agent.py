@@ -44,20 +44,14 @@ _FORWARD_ENV_KEYS = (
 _DEFAULT_BENCH_APPEND_PROMPT = (
     "You are running non-interactively on a scored task. A hidden verification suite will\n"
     "check your work after your final turn; there is no opportunity for follow-up.\n\n"
-    "Work practices:\n"
-    "- Start by examining the environment the task actually hands you (cwd contents, referenced\n"
-    "  files, installed tools) before planning.\n"
     "- Treat every constraint in the task description as binding: exact output paths, file\n"
     "  formats, field names, value ranges, and any 'do not modify X' clauses.\n"
-    "- When replacing values inside files, replace only the exact target value and preserve the\n"
-    "  surrounding structure; do not restructure, reformat, or 'improve' unrelated content.\n"
+    "- When replacing values inside files, replace only the exact target value and preserve\n"
+    "  the surrounding structure. Do not restructure, reformat, or 'improve' unrelated content.\n"
     "- Do not modify files that are not part of the task, even if they contain similar-looking\n"
     "  content (examples, READMEs, placeholders, vendored copies, etc.).\n"
-    "- Before finishing, verify your result: read the output file(s) back, run the produced\n"
-    "  program/script, or run the task's own test command when one is obvious. Fix any\n"
-    "  mismatch before ending the turn.\n"
-    "- Prefer small, targeted tool calls over large speculative ones; avoid repeating commands\n"
-    "  whose answer you already have.\n"
+    "- Before ending your final turn, confirm the required output files/paths exist and match\n"
+    "  the requested format (read them back or run the produced script once).\n"
 )
 
 def _resolve_bundle_dir() -> Path:
