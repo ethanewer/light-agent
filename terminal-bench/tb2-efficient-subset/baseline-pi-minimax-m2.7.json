@@ -1,0 +1,93 @@
+{
+    "id": "6ee8a26f-2083-42a4-b2f4-6525b652eb0c",
+    "started_at": "2026-04-18T20:37:18.209339",
+    "finished_at": "2026-04-18T21:38:41.871527",
+    "n_total_trials": 50,
+    "stats": {
+        "n_trials": 50,
+        "n_errors": 7,
+        "evals": {
+            "pi__terminal-bench": {
+                "n_trials": 48,
+                "n_errors": 7,
+                "metrics": [
+                    {
+                        "mean": 0.54
+                    }
+                ],
+                "pass_at_k": {
+                    "2": 0.67,
+                    "4": 0.7,
+                    "5": 0.7
+                },
+                "reward_stats": {
+                    "reward": {
+                        "0.0": [
+                            "compile-compcert__fJx45CS",
+                            "compile-compcert__ShmQeki",
+                            "compile-compcert__H2crb9r",
+                            "compile-compcert__A76pgAa",
+                            "compile-compcert__TvYxcrX",
+                            "torch-tensor-parallelism__izzdtFq",
+                            "torch-tensor-parallelism__qkTK2rv",
+                            "torch-tensor-parallelism__FU3V9SW",
+                            "torch-tensor-parallelism__No4TS78",
+                            "torch-tensor-parallelism__atY3oiV",
+                            "rstan-to-pystan__gwAu9ms",
+                            "sparql-university__xuF23DE",
+                            "sparql-university__r3k4Xy3",
+                            "sqlite-db-truncate__zm7AQpG",
+                            "chess-best-move__AwR4mu5",
+                            "chess-best-move__gsyNpfn",
+                            "chess-best-move__7f62xfq",
+                            "chess-best-move__nZci2Lc",
+                            "chess-best-move__rLq5oA8",
+                            "sanitize-git-repo__gcdpfzb",
+                            "sanitize-git-repo__CsNvnqf"
+                        ],
+                        "1.0": [
+                            "git-leak-recovery__5qKnGGe",
+                            "git-leak-recovery__MdjuDDa",
+                            "git-leak-recovery__6hs2TVR",
+                            "git-leak-recovery__GcYbEgB",
+                            "git-leak-recovery__rVW4dnT",
+                            "rstan-to-pystan__DJgiwE2",
+                            "rstan-to-pystan__a9Suo2N",
+                            "rstan-to-pystan__4R6gUfH",
+                            "rstan-to-pystan__3FpfJhp",
+                            "multi-source-data-merger__iNP8cfm",
+                            "multi-source-data-merger__oajaXF5",
+                            "multi-source-data-merger__3zwJ5RJ",
+                            "multi-source-data-merger__CibDUAT",
+                            "multi-source-data-merger__M2g5k6G",
+                            "sparql-university__E6K8Q8b",
+                            "sparql-university__35LyD4K",
+                            "sparql-university__GVQaLoH",
+                            "sqlite-db-truncate__pPkTciA",
+                            "sqlite-db-truncate__CPQvJ64",
+                            "sqlite-db-truncate__nKqjSNf",
+                            "sqlite-db-truncate__WaJDGHQ",
+                            "extract-elf__ygzFXsF",
+                            "extract-elf__eQpiezo",
+                            "extract-elf__9NmTvdy",
+                            "sanitize-git-repo__A84jEah",
+                            "sanitize-git-repo__cYwu3WN",
+                            "sanitize-git-repo__2xGXq2B"
+                        ]
+                    }
+                },
+                "exception_stats": {
+                    "AgentTimeoutError": [
+                        "compile-compcert__ShmQeki",
+                        "compile-compcert__H2crb9r",
+                        "compile-compcert__A76pgAa",
+                        "compile-compcert__TvYxcrX",
+                        "chess-best-move__7f62xfq",
+                        "extract-elf__zCDvzhK",
+                        "extract-elf__623BrJK"
+                    ]
+                }
+            }
+        }
+    }
+}
