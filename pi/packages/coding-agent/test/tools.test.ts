@@ -8,7 +8,7 @@ import { editTool } from "../src/core/tools/edit.js";
 import { findTool } from "../src/core/tools/find.js";
 import { grepTool } from "../src/core/tools/grep.js";
 import { lsTool } from "../src/core/tools/ls.js";
-import { readTool } from "../src/core/tools/read.js";
+import { createReadTool, createReadToolDefinition, readTool } from "../src/core/tools/read.js";
 import { writeTool } from "../src/core/tools/write.js";
 import * as shellModule from "../src/utils/shell.js";
 
@@ -187,6 +187,57 @@ describe("Coding Agent Tools", () => {
 
 			expect(output).toContain("definitely not a png");
 			expect(result.content.some((c: any) => c.type === "image")).toBe(false);
+		});
+
+		it("should use delegated read operations exactly once for non-image files", async () => {
+			const access = vi.fn().mockResolvedValue(undefined);
+			const detectImageMimeType = vi.fn().mockResolvedValue(null);
+			const readFile = vi.fn().mockResolvedValue(Buffer.from("remote text payload", "utf-8"));
+			const tool = createReadTool(testDir, {
+				operations: {
+					access,
+					detectImageMimeType,
+					readFile,
+				},
+			});
+
+			const result = await tool.execute("test-call-remote-read", { path: "remote-file.txt" });
+
+			expect(access).toHaveBeenCalledTimes(1);
+			expect(detectImageMimeType).toHaveBeenCalledTimes(1);
+			expect(readFile).toHaveBeenCalledTimes(1);
+			expect(getTextOutput(result)).toContain("remote text payload");
+		});
+
+		it("should advertise direct image attachments for standalone read tool definitions", () => {
+			const tool = createReadToolDefinition(testDir);
+
+			expect(tool.description).toContain(
+				"Supports text files and images (jpg, png, gif, webp). Images are sent as attachments.",
+			);
+		});
+
+		it("should keep direct image attachments when only modelRegistry is supplied", async () => {
+			const png1x1Base64 =
+				"iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR4nGNgYGD4DwABBAEAX+XDSwAAAABJRU5ErkJggg==";
+			const testFile = join(testDir, "image.txt");
+			writeFileSync(testFile, Buffer.from(png1x1Base64, "base64"));
+
+			const modelRegistry = {
+				find: vi.fn().mockReturnValue(undefined),
+				hasConfiguredAuth: vi.fn().mockReturnValue(false),
+				getApiKeyAndHeaders: vi.fn(),
+			};
+			const tool = createReadTool(testDir, { modelRegistry: modelRegistry as any, autoResizeImages: false });
+
+			expect(tool.description).toContain(
+				"Supports text files and images (jpg, png, gif, webp). Images are sent as attachments.",
+			);
+
+			const result = await tool.execute("test-call-img-model-registry-only", { path: testFile });
+
+			expect(modelRegistry.find).not.toHaveBeenCalled();
+			expect(result.content.some((c: any) => c.type === "image")).toBe(true);
 		});
 	});
 

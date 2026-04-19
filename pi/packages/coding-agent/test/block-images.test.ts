@@ -1,10 +1,11 @@
 import { mkdirSync, rmSync, writeFileSync } from "fs";
 import { tmpdir } from "os";
 import { join } from "path";
-import { afterEach, beforeEach, describe, expect, it } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { processFileArguments } from "../src/cli/file-processor.js";
+import type { ExtensionContext } from "../src/core/extensions/types.js";
 import { SettingsManager } from "../src/core/settings-manager.js";
-import { createReadTool } from "../src/core/tools/read.js";
+import { createReadTool, createReadToolDefinition } from "../src/core/tools/read.js";
 
 // 1x1 red PNG image as base64 (smallest valid PNG)
 const TINY_PNG_BASE64 =
@@ -80,6 +81,108 @@ describe("blockImages setting", () => {
 			expect(result.content[0].type).toBe("text");
 			const textContent = result.content[0] as { type: "text"; text: string };
 			expect(textContent.text).toContain("Hello, world!");
+		});
+
+		it.each([true, false])(
+			"should skip fallback vision when no configured fallback model exists (autoResize=%s)",
+			async (autoResizeImages) => {
+				const imagePath = join(testDir, "test.png");
+				writeFileSync(imagePath, Buffer.from(TINY_PNG_BASE64, "base64"));
+
+				const getApiKeyAndHeaders = vi.fn();
+				const fallbackModel = { id: "qwen/qwen3.6-plus", provider: "openrouter" };
+				const ctx = {
+					model: { input: ["text"] },
+					modelRegistry: {
+						find: vi.fn().mockReturnValue(fallbackModel),
+						hasConfiguredAuth: vi.fn().mockReturnValue(false),
+						getApiKeyAndHeaders,
+					},
+				} as unknown as ExtensionContext;
+
+				const tool = createReadToolDefinition(testDir, {
+					autoResizeImages,
+					modelRegistry: ctx.modelRegistry,
+				});
+				const result = await tool.execute("test-missing-fallback", { path: imagePath }, undefined, undefined, ctx);
+
+				expect(ctx.modelRegistry.find).toHaveBeenCalled();
+				expect(ctx.modelRegistry.hasConfiguredAuth).not.toHaveBeenCalled();
+				expect(getApiKeyAndHeaders).not.toHaveBeenCalled();
+				expect(result.content).toHaveLength(1);
+				expect(result.content[0].type).toBe("text");
+				expect((result.content[0] as { type: "text"; text: string }).text).toContain(
+					"Image omitted: no vision-capable model path is configured.",
+				);
+			},
+		);
+
+		it("should not advertise or invoke fallback vision for text-only fallback models", async () => {
+			const imagePath = join(testDir, "test.png");
+			writeFileSync(imagePath, Buffer.from(TINY_PNG_BASE64, "base64"));
+
+			const getApiKeyAndHeaders = vi.fn();
+			const fallbackModel = { id: "qwen/qwen3.6-plus", provider: "openrouter", input: ["text"] };
+			const modelRegistry = {
+				find: vi.fn().mockReturnValue(fallbackModel),
+				hasConfiguredAuth: vi.fn().mockReturnValue(true),
+				getApiKeyAndHeaders,
+			};
+			const ctx = {
+				model: { input: ["text"] },
+				modelRegistry,
+			} as unknown as ExtensionContext;
+
+			const tool = createReadToolDefinition(testDir, {
+				autoResizeImages: false,
+				currentModel: ctx.model as any,
+				modelRegistry: modelRegistry as any,
+			});
+
+			expect(tool.description).toBe(
+				"Read the contents of a file. Supports text files. For text files, output is truncated to 2000 lines or 50KB (whichever is hit first). Use offset/limit for large files. When you need the full file, continue with offset until complete.",
+			);
+
+			const result = await tool.execute("test-text-only-fallback", { path: imagePath }, undefined, undefined, ctx);
+
+			expect(modelRegistry.find).toHaveBeenCalled();
+			expect(modelRegistry.hasConfiguredAuth).not.toHaveBeenCalled();
+			expect(getApiKeyAndHeaders).not.toHaveBeenCalled();
+			expect(result.content).toHaveLength(1);
+			expect(result.content[0].type).toBe("text");
+			expect((result.content[0] as { type: "text"; text: string }).text).toContain(
+				"Image omitted: no vision-capable model path is configured.",
+			);
+		});
+
+		it("should honor model-aware execution semantics in createReadTool without an AgentSession", async () => {
+			const imagePath = join(testDir, "test.png");
+			writeFileSync(imagePath, Buffer.from(TINY_PNG_BASE64, "base64"));
+
+			const modelRegistry = {
+				find: vi.fn().mockReturnValue(undefined),
+				hasConfiguredAuth: vi.fn().mockReturnValue(false),
+				getApiKeyAndHeaders: vi.fn(),
+			};
+			const tool = createReadTool(testDir, {
+				autoResizeImages: false,
+				currentModel: { input: ["text"] } as any,
+				modelRegistry: modelRegistry as any,
+			});
+
+			expect(tool.description).toBe(
+				"Read the contents of a file. Supports text files. For text files, output is truncated to 2000 lines or 50KB (whichever is hit first). Use offset/limit for large files. When you need the full file, continue with offset until complete.",
+			);
+
+			const result = await tool.execute("test-create-read-tool-context", { path: imagePath });
+
+			expect(modelRegistry.find).toHaveBeenCalled();
+			expect(result.content).toHaveLength(1);
+			expect(result.content[0].type).toBe("text");
+			expect((result.content[0] as { type: "text"; text: string }).text).toContain(
+				"Image omitted: no vision-capable model path is configured.",
+			);
+			expect(result.content.some((c) => c.type === "image")).toBe(false);
 		});
 	});
 

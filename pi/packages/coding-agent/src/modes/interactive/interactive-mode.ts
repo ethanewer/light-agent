@@ -4230,7 +4230,7 @@ export class InteractiveMode {
 
 						try {
 							this.session.modelRegistry.authStorage.logout(providerId);
-							this.session.modelRegistry.refresh();
+							this.session.refreshModelRegistryState();
 							await this.updateAvailableProviderCount();
 							this.showStatus(`Logged out of ${providerName}`);
 						} catch (error: unknown) {
@@ -4325,7 +4325,7 @@ export class InteractiveMode {
 
 			// Success
 			restoreEditor();
-			this.session.modelRegistry.refresh();
+			this.session.refreshModelRegistryState();
 
 			let selectedModel: Model<any> | undefined;
 			let selectionError: string | undefined;
