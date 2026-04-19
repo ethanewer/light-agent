@@ -723,6 +723,18 @@ async function generateModels() {
 			candidate.cost.output = 1.9;
 			candidate.cost.cacheRead = 0.119;
 		}
+		// OpenRouter reports only 4096 output tokens for minimax-m2.7, but the underlying model
+		// supports much larger outputs (the Vercel AI Gateway entry reports ~131K). The low limit
+		// leaves reasoning models with no budget to emit any assistant output once thinking tokens
+		// are consumed, manifesting as stopReason=length mid-task. Bump to the native capacity.
+		if (
+			candidate.provider === "openrouter" &&
+			(candidate.id === "minimax/minimax-m2.7" || candidate.id === "minimax/minimax-m2.7-highspeed")
+		) {
+			if (!candidate.maxTokens || candidate.maxTokens < 32768) {
+				candidate.maxTokens = 131072;
+			}
+		}
 
 	}
 
