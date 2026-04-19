@@ -16,6 +16,14 @@ GLOBAL_PI_PATH="${GLOBAL_BIN_DIR}/pi"
 echo "==> Installing workspace dependencies"
 (cd "${PI_ROOT}" && npm install)
 
+OAUTH_SECRETS_DIR="${PI_ROOT}/packages/ai/src/utils/oauth"
+OAUTH_SECRETS_FILE="${OAUTH_SECRETS_DIR}/google-oauth-secrets.ts"
+OAUTH_SECRETS_EXAMPLE="${OAUTH_SECRETS_DIR}/google-oauth-secrets.example.ts"
+if [[ ! -f "${OAUTH_SECRETS_FILE}" ]]; then
+	echo "==> Seeding ${OAUTH_SECRETS_FILE} from example (Google OAuth login will be disabled)"
+	cp "${OAUTH_SECRETS_EXAMPLE}" "${OAUTH_SECRETS_FILE}"
+fi
+
 echo "==> Building pi binary from local source"
 (cd "${PI_ROOT}" && npm run build:cli-binary)
 
