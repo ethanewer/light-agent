@@ -258,6 +258,7 @@ class PiBenchAgent(HarborBaseAgent):  # type: ignore[misc]
 
         binary = getattr(self, "_remote_binary", f"{_REMOTE_BUNDLE_DIR}/pi-linux-arm64")
         log_file = "/tmp/pi-output.log"
+        event_log = "/tmp/pi-events.jsonl"
         debug_log = "/tmp/pi-debug.log"
         config_block = "\n".join(
             [
@@ -267,7 +268,7 @@ class PiBenchAgent(HarborBaseAgent):  # type: ignore[misc]
                 f"tools={self.tools}",
                 f"system_prompt_provided={'yes' if self.system_prompt else 'no'}",
                 f"extra_args={self.extra_args or '<none>'}",
-                "=== PI OUTPUT ===",
+                "=== PI EVENT STREAM (JSONL) ===",
             ]
         )
         prompt_flag = f" --system-prompt {shlex.quote(self.system_prompt)}" if self.system_prompt else ""
@@ -276,11 +277,12 @@ class PiBenchAgent(HarborBaseAgent):  # type: ignore[misc]
             extra_args = " " + " ".join(shlex.quote(arg) for arg in shlex.split(self.extra_args))
         command = (
             f"cat <<'EOF' >{log_file}\n{config_block}\nEOF\n"
-            f"{binary} --print --no-session --no-context-files --no-extensions --no-skills "
+            f"{binary} --mode json --no-session --no-context-files --no-extensions --no-skills "
             f"--no-prompt-templates --no-themes --tools {shlex.quote(self.tools)} --thinking {shlex.quote(self.thinking)} "
             f"--model {shlex.quote(self.model)}{prompt_flag}{extra_args} "
-            f"{shlex.quote(instruction)} >>{log_file} 2>{debug_log}; "
+            f"{shlex.quote(instruction)} >{event_log} 2>{debug_log}; "
             "PI_EXIT=$?; "
+            f"cat {event_log} >> {log_file} 2>/dev/null; "
             f"echo '' >> {log_file}; "
             f"echo '=== STDERR/DEBUG LOG ===' >> {log_file}; "
             f"cat {debug_log} >> {log_file} 2>/dev/null; "
