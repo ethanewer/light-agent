@@ -1,0 +1,13 @@
+.DS_Store
+
+pi/node_modules/
+pi/package-lock.json
+pi/packages/ai/src/models.generated.ts
+pi/packages/*/dist/
+pi/packages/ai/src/utils/oauth/google-oauth-secrets.ts
+
+terminal-bench/jobs/
+terminal-bench/__pycache__/
+terminal-bench/bin/pi-benchmark-install.json
+
+results/

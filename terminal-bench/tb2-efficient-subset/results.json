@@ -1,0 +1,1044 @@
+{
+  "best_subsets": {
+    "5": {
+      "selected_tasks": [
+        "reshard-c4-data",
+        "cobol-modernization",
+        "mteb-leaderboard",
+        "polyglot-rust-c",
+        "protein-assembly"
+      ],
+      "weights": {
+        "reshard-c4-data": 0.228947,
+        "cobol-modernization": 0.118986,
+        "mteb-leaderboard": 0.094463,
+        "polyglot-rust-c": 0.076782,
+        "protein-assembly": 0.142092
+      },
+      "intercept": 0.191536,
+      "r2_loocv": 0.954916,
+      "runtime_per_trial_h": 1.31
+    },
+    "6": {
+      "selected_tasks": [
+        "bn-fit-modify",
+        "rstan-to-pystan",
+        "sparql-university",
+        "compile-compcert",
+        "torch-tensor-parallelism",
+        "path-tracing"
+      ],
+      "weights": {
+        "bn-fit-modify": 0.11573,
+        "rstan-to-pystan": 0.093287,
+        "sparql-university": 0.166288,
+        "compile-compcert": 0.097091,
+        "torch-tensor-parallelism": 0.062778,
+        "path-tracing": 0.077687
+      },
+      "intercept": 0.224083,
+      "r2_loocv": 0.964082,
+      "runtime_per_trial_h": 1.7
+    },
+    "7": {
+      "selected_tasks": [
+        "kv-store-grpc",
+        "rstan-to-pystan",
+        "sparql-university",
+        "compile-compcert",
+        "torch-tensor-parallelism",
+        "path-tracing",
+        "feal-differential-cryptanalysis"
+      ],
+      "weights": {
+        "kv-store-grpc": 0.070657,
+        "rstan-to-pystan": 0.077613,
+        "sparql-university": 0.170006,
+        "compile-compcert": 0.073359,
+        "torch-tensor-parallelism": 0.064279,
+        "path-tracing": 0.090529,
+        "feal-differential-cryptanalysis": 0.104038
+      },
+      "intercept": 0.189443,
+      "r2_loocv": 0.971053,
+      "runtime_per_trial_h": 1.82
+    },
+    "8": {
+      "selected_tasks": [
+        "kv-store-grpc",
+        "rstan-to-pystan",
+        "build-pov-ray",
+        "sparql-university",
+        "compile-compcert",
+        "torch-tensor-parallelism",
+        "path-tracing",
+        "feal-differential-cryptanalysis"
+      ],
+      "weights": {
+        "kv-store-grpc": 0.064356,
+        "rstan-to-pystan": 0.077766,
+        "build-pov-ray": 0.065542,
+        "sparql-university": 0.141233,
+        "compile-compcert": 0.061574,
+        "torch-tensor-parallelism": 0.062691,
+        "path-tracing": 0.093655,
+        "feal-differential-cryptanalysis": 0.111832
+      },
+      "intercept": 0.161922,
+      "r2_loocv": 0.981656,
+      "runtime_per_trial_h": 2.09
+    },
+    "9": {
+      "selected_tasks": [
+        "rstan-to-pystan",
+        "chess-best-move",
+        "sanitize-git-repo",
+        "sparql-university",
+        "compile-compcert",
+        "sqlite-db-truncate",
+        "torch-tensor-parallelism",
+        "path-tracing",
+        "git-leak-recovery"
+      ],
+      "weights": {
+        "rstan-to-pystan": 0.062537,
+        "chess-best-move": 0.040714,
+        "sanitize-git-repo": 0.041674,
+        "sparql-university": 0.100264,
+        "compile-compcert": 0.070466,
+        "sqlite-db-truncate": 0.104894,
+        "torch-tensor-parallelism": 0.070164,
+        "path-tracing": 0.071956,
+        "git-leak-recovery": 0.224947
+      },
+      "intercept": 0.049931,
+      "r2_loocv": 0.97753,
+      "runtime_per_trial_h": 1.97
+    },
+    "10": {
+      "selected_tasks": [
+        "regex-chess",
+        "rstan-to-pystan",
+        "chess-best-move",
+        "sanitize-git-repo",
+        "sparql-university",
+        "compile-compcert",
+        "sqlite-db-truncate",
+        "torch-tensor-parallelism",
+        "path-tracing",
+        "git-leak-recovery"
+      ],
+      "weights": {
+        "regex-chess": 0.028405,
+        "rstan-to-pystan": 0.055875,
+        "chess-best-move": 0.043217,
+        "sanitize-git-repo": 0.040137,
+        "sparql-university": 0.089438,
+        "compile-compcert": 0.073676,
+        "sqlite-db-truncate": 0.105536,
+        "torch-tensor-parallelism": 0.057779,
+        "path-tracing": 0.070048,
+        "git-leak-recovery": 0.243782
+      },
+      "intercept": 0.036522,
+      "r2_loocv": 0.980182,
+      "runtime_per_trial_h": 2.53
+    },
+    "11": {
+      "selected_tasks": [
+        "rstan-to-pystan",
+        "chess-best-move",
+        "circuit-fibsqrt",
+        "sparql-university",
+        "compile-compcert",
+        "sqlite-db-truncate",
+        "torch-tensor-parallelism",
+        "extract-elf",
+        "path-tracing",
+        "portfolio-optimization",
+        "git-leak-recovery"
+      ],
+      "weights": {
+        "rstan-to-pystan": 0.042439,
+        "chess-best-move": 0.052237,
+        "circuit-fibsqrt": 0.080118,
+        "sparql-university": 0.070805,
+        "compile-compcert": 0.05978,
+        "sqlite-db-truncate": 0.073205,
+        "torch-tensor-parallelism": 0.061048,
+        "extract-elf": 0.039884,
+        "path-tracing": 0.075984,
+        "portfolio-optimization": 0.059954,
+        "git-leak-recovery": 0.268498
+      },
+      "intercept": -0.038537,
+      "r2_loocv": 0.986114,
+      "runtime_per_trial_h": 2.57
+    },
+    "12": {
+      "selected_tasks": [
+        "rstan-to-pystan",
+        "chess-best-move",
+        "sanitize-git-repo",
+        "circuit-fibsqrt",
+        "sparql-university",
+        "compile-compcert",
+        "sqlite-db-truncate",
+        "torch-tensor-parallelism",
+        "multi-source-data-merger",
+        "extract-elf",
+        "path-tracing",
+        "git-leak-recovery"
+      ],
+      "weights": {
+        "rstan-to-pystan": 0.055432,
+        "chess-best-move": 0.044294,
+        "sanitize-git-repo": 0.032998,
+        "circuit-fibsqrt": 0.071363,
+        "sparql-university": 0.068956,
+        "compile-compcert": 0.060527,
+        "sqlite-db-truncate": 0.067675,
+        "torch-tensor-parallelism": 0.054852,
+        "multi-source-data-merger": 0.057654,
+        "extract-elf": 0.037903,
+        "path-tracing": 0.063315,
+        "git-leak-recovery": 0.252448
+      },
+      "intercept": -0.028084,
+      "r2_loocv": 0.990105,
+      "runtime_per_trial_h": 2.61
+    },
+    "13": {
+      "selected_tasks": [
+        "rstan-to-pystan",
+        "chess-best-move",
+        "sanitize-git-repo",
+        "circuit-fibsqrt",
+        "sparql-university",
+        "compile-compcert",
+        "sqlite-db-truncate",
+        "torch-tensor-parallelism",
+        "multi-source-data-merger",
+        "extract-elf",
+        "path-tracing",
+        "git-leak-recovery",
+        "pytorch-model-recovery"
+      ],
+      "weights": {
+        "rstan-to-pystan": 0.054856,
+        "chess-best-move": 0.04424,
+        "sanitize-git-repo": 0.035614,
+        "circuit-fibsqrt": 0.075135,
+        "sparql-university": 0.05631,
+        "compile-compcert": 0.061686,
+        "sqlite-db-truncate": 0.067998,
+        "torch-tensor-parallelism": 0.054504,
+        "multi-source-data-merger": 0.073332,
+        "extract-elf": 0.032795,
+        "path-tracing": 0.064666,
+        "git-leak-recovery": 0.251343,
+        "pytorch-model-recovery": 0.014246
+      },
+      "intercept": -0.045868,
+      "r2_loocv": 0.990265,
+      "runtime_per_trial_h": 2.82
+    },
+    "14": {
+      "selected_tasks": [
+        "install-windows-3.11",
+        "rstan-to-pystan",
+        "chess-best-move",
+        "sanitize-git-repo",
+        "circuit-fibsqrt",
+        "sparql-university",
+        "compile-compcert",
+        "sqlite-db-truncate",
+        "torch-tensor-parallelism",
+        "multi-source-data-merger",
+        "extract-elf",
+        "path-tracing",
+        "git-leak-recovery",
+        "pytorch-model-recovery"
+      ],
+      "weights": {
+        "install-windows-3.11": 0.032502,
+        "rstan-to-pystan": 0.051405,
+        "chess-best-move": 0.051816,
+        "sanitize-git-repo": 0.034569,
+        "circuit-fibsqrt": 0.079208,
+        "sparql-university": 0.050172,
+        "compile-compcert": 0.06102,
+        "sqlite-db-truncate": 0.066182,
+        "torch-tensor-parallelism": 0.048094,
+        "multi-source-data-merger": 0.080831,
+        "extract-elf": 0.031135,
+        "path-tracing": 0.060331,
+        "git-leak-recovery": 0.253307,
+        "pytorch-model-recovery": 0.024067
+      },
+      "intercept": -0.056982,
+      "r2_loocv": 0.991293,
+      "runtime_per_trial_h": 3.17
+    },
+    "15": {
+      "selected_tasks": [
+        "adaptive-rejection-sampler",
+        "install-windows-3.11",
+        "rstan-to-pystan",
+        "chess-best-move",
+        "sanitize-git-repo",
+        "circuit-fibsqrt",
+        "sparql-university",
+        "compile-compcert",
+        "sqlite-db-truncate",
+        "torch-tensor-parallelism",
+        "multi-source-data-merger",
+        "extract-elf",
+        "path-tracing",
+        "git-leak-recovery",
+        "pytorch-model-recovery"
+      ],
+      "weights": {
+        "adaptive-rejection-sampler": 0.017534,
+        "install-windows-3.11": 0.038041,
+        "rstan-to-pystan": 0.055504,
+        "chess-best-move": 0.050647,
+        "sanitize-git-repo": 0.034079,
+        "circuit-fibsqrt": 0.077724,
+        "sparql-university": 0.051869,
+        "compile-compcert": 0.052911,
+        "sqlite-db-truncate": 0.06272,
+        "torch-tensor-parallelism": 0.044399,
+        "multi-source-data-merger": 0.092341,
+        "extract-elf": 0.032792,
+        "path-tracing": 0.056804,
+        "git-leak-recovery": 0.250414,
+        "pytorch-model-recovery": 0.025603
+      },
+      "intercept": -0.068162,
+      "r2_loocv": 0.991623,
+      "runtime_per_trial_h": 3.38
+    }
+  },
+  "error_bounds": [
+    {
+      "n_tasks": 5,
+      "N": 1,
+      "serial_h": 1.3,
+      "e95": 14.0,
+      "e99": 20.6
+    },
+    {
+      "n_tasks": 5,
+      "N": 2,
+      "serial_h": 2.6,
+      "e95": 11.6,
+      "e99": 17.1
+    },
+    {
+      "n_tasks": 5,
+      "N": 3,
+      "serial_h": 3.9,
+      "e95": 10.9,
+      "e99": 14.8
+    },
+    {
+      "n_tasks": 5,
+      "N": 4,
+      "serial_h": 5.2,
+      "e95": 9.7,
+      "e99": 13.8
+    },
+    {
+      "n_tasks": 5,
+      "N": 5,
+      "serial_h": 6.6,
+      "e95": 9.0,
+      "e99": 12.8
+    },
+    {
+      "n_tasks": 6,
+      "N": 1,
+      "serial_h": 1.7,
+      "e95": 15.0,
+      "e99": 20.8
+    },
+    {
+      "n_tasks": 6,
+      "N": 2,
+      "serial_h": 3.4,
+      "e95": 11.7,
+      "e99": 16.4
+    },
+    {
+      "n_tasks": 6,
+      "N": 3,
+      "serial_h": 5.1,
+      "e95": 9.8,
+      "e99": 14.7
+    },
+    {
+      "n_tasks": 6,
+      "N": 4,
+      "serial_h": 6.8,
+      "e95": 9.2,
+      "e99": 13.2
+    },
+    {
+      "n_tasks": 6,
+      "N": 5,
+      "serial_h": 8.5,
+      "e95": 8.7,
+      "e99": 12.4
+    },
+    {
+      "n_tasks": 7,
+      "N": 1,
+      "serial_h": 1.8,
+      "e95": 13.8,
+      "e99": 18.8
+    },
+    {
+      "n_tasks": 7,
+      "N": 2,
+      "serial_h": 3.6,
+      "e95": 10.6,
+      "e99": 16.1
+    },
+    {
+      "n_tasks": 7,
+      "N": 3,
+      "serial_h": 5.5,
+      "e95": 9.2,
+      "e99": 13.3
+    },
+    {
+      "n_tasks": 7,
+      "N": 4,
+      "serial_h": 7.3,
+      "e95": 8.4,
+      "e99": 11.6
+    },
+    {
+      "n_tasks": 7,
+      "N": 5,
+      "serial_h": 9.1,
+      "e95": 7.7,
+      "e99": 11.3
+    },
+    {
+      "n_tasks": 8,
+      "N": 1,
+      "serial_h": 2.1,
+      "e95": 13.5,
+      "e99": 18.5
+    },
+    {
+      "n_tasks": 8,
+      "N": 2,
+      "serial_h": 4.2,
+      "e95": 10.2,
+      "e99": 13.6
+    },
+    {
+      "n_tasks": 8,
+      "N": 3,
+      "serial_h": 6.3,
+      "e95": 8.5,
+      "e99": 12.0
+    },
+    {
+      "n_tasks": 8,
+      "N": 4,
+      "serial_h": 8.4,
+      "e95": 7.7,
+      "e99": 10.6
+    },
+    {
+      "n_tasks": 8,
+      "N": 5,
+      "serial_h": 10.4,
+      "e95": 7.2,
+      "e99": 9.9
+    },
+    {
+      "n_tasks": 9,
+      "N": 1,
+      "serial_h": 2.0,
+      "e95": 12.3,
+      "e99": 18.0
+    },
+    {
+      "n_tasks": 9,
+      "N": 2,
+      "serial_h": 3.9,
+      "e95": 9.9,
+      "e99": 13.9
+    },
+    {
+      "n_tasks": 9,
+      "N": 3,
+      "serial_h": 5.9,
+      "e95": 8.6,
+      "e99": 11.9
+    },
+    {
+      "n_tasks": 9,
+      "N": 4,
+      "serial_h": 7.9,
+      "e95": 7.9,
+      "e99": 10.7
+    },
+    {
+      "n_tasks": 9,
+      "N": 5,
+      "serial_h": 9.9,
+      "e95": 7.4,
+      "e99": 10.0
+    },
+    {
+      "n_tasks": 10,
+      "N": 1,
+      "serial_h": 2.5,
+      "e95": 12.1,
+      "e99": 17.9
+    },
+    {
+      "n_tasks": 10,
+      "N": 2,
+      "serial_h": 5.1,
+      "e95": 9.6,
+      "e99": 13.2
+    },
+    {
+      "n_tasks": 10,
+      "N": 3,
+      "serial_h": 7.6,
+      "e95": 8.3,
+      "e99": 11.7
+    },
+    {
+      "n_tasks": 10,
+      "N": 4,
+      "serial_h": 10.1,
+      "e95": 7.5,
+      "e99": 10.5
+    },
+    {
+      "n_tasks": 10,
+      "N": 5,
+      "serial_h": 12.6,
+      "e95": 7.0,
+      "e99": 10.1
+    },
+    {
+      "n_tasks": 11,
+      "N": 1,
+      "serial_h": 2.6,
+      "e95": 13.5,
+      "e99": 18.9
+    },
+    {
+      "n_tasks": 11,
+      "N": 2,
+      "serial_h": 5.1,
+      "e95": 9.1,
+      "e99": 13.7
+    },
+    {
+      "n_tasks": 11,
+      "N": 3,
+      "serial_h": 7.7,
+      "e95": 8.0,
+      "e99": 11.8
+    },
+    {
+      "n_tasks": 11,
+      "N": 4,
+      "serial_h": 10.3,
+      "e95": 7.2,
+      "e99": 10.7
+    },
+    {
+      "n_tasks": 11,
+      "N": 5,
+      "serial_h": 12.8,
+      "e95": 6.5,
+      "e99": 10.0
+    },
+    {
+      "n_tasks": 12,
+      "N": 1,
+      "serial_h": 2.6,
+      "e95": 11.9,
+      "e99": 18.8
+    },
+    {
+      "n_tasks": 12,
+      "N": 2,
+      "serial_h": 5.2,
+      "e95": 8.8,
+      "e99": 12.6
+    },
+    {
+      "n_tasks": 12,
+      "N": 3,
+      "serial_h": 7.8,
+      "e95": 7.5,
+      "e99": 10.6
+    },
+    {
+      "n_tasks": 12,
+      "N": 4,
+      "serial_h": 10.4,
+      "e95": 6.5,
+      "e99": 10.1
+    },
+    {
+      "n_tasks": 12,
+      "N": 5,
+      "serial_h": 13.0,
+      "e95": 6.0,
+      "e99": 9.2
+    },
+    {
+      "n_tasks": 13,
+      "N": 1,
+      "serial_h": 2.8,
+      "e95": 11.8,
+      "e99": 19.0
+    },
+    {
+      "n_tasks": 13,
+      "N": 2,
+      "serial_h": 5.6,
+      "e95": 8.6,
+      "e99": 12.9
+    },
+    {
+      "n_tasks": 13,
+      "N": 3,
+      "serial_h": 8.5,
+      "e95": 7.3,
+      "e99": 11.0
+    },
+    {
+      "n_tasks": 13,
+      "N": 4,
+      "serial_h": 11.3,
+      "e95": 6.3,
+      "e99": 9.9
+    },
+    {
+      "n_tasks": 13,
+      "N": 5,
+      "serial_h": 14.1,
+      "e95": 5.9,
+      "e99": 8.7
+    },
+    {
+      "n_tasks": 14,
+      "N": 1,
+      "serial_h": 3.2,
+      "e95": 11.9,
+      "e99": 19.0
+    },
+    {
+      "n_tasks": 14,
+      "N": 2,
+      "serial_h": 6.3,
+      "e95": 8.5,
+      "e99": 12.9
+    },
+    {
+      "n_tasks": 14,
+      "N": 3,
+      "serial_h": 9.5,
+      "e95": 7.1,
+      "e99": 10.9
+    },
+    {
+      "n_tasks": 14,
+      "N": 4,
+      "serial_h": 12.7,
+      "e95": 6.3,
+      "e99": 9.9
+    },
+    {
+      "n_tasks": 14,
+      "N": 5,
+      "serial_h": 15.8,
+      "e95": 5.9,
+      "e99": 8.8
+    },
+    {
+      "n_tasks": 15,
+      "N": 1,
+      "serial_h": 3.4,
+      "e95": 12.0,
+      "e99": 18.6
+    },
+    {
+      "n_tasks": 15,
+      "N": 2,
+      "serial_h": 6.8,
+      "e95": 8.3,
+      "e99": 12.8
+    },
+    {
+      "n_tasks": 15,
+      "N": 3,
+      "serial_h": 10.1,
+      "e95": 7.0,
+      "e99": 10.7
+    },
+    {
+      "n_tasks": 15,
+      "N": 4,
+      "serial_h": 13.5,
+      "e95": 6.1,
+      "e99": 9.7
+    },
+    {
+      "n_tasks": 15,
+      "N": 5,
+      "serial_h": 16.9,
+      "e95": 5.7,
+      "e99": 8.7
+    }
+  ],
+  "concurrency": {
+    "12t5": [
+      {
+        "concurrency": 1,
+        "mean_h": 13.0,
+        "std_h": 1.2
+      },
+      {
+        "concurrency": 4,
+        "mean_h": 3.5,
+        "std_h": 0.4
+      },
+      {
+        "concurrency": 8,
+        "mean_h": 2.0,
+        "std_h": 0.3
+      },
+      {
+        "concurrency": 12,
+        "mean_h": 1.5,
+        "std_h": 0.2
+      },
+      {
+        "concurrency": 16,
+        "mean_h": 1.3,
+        "std_h": 0.2
+      }
+    ]
+  },
+  "pareto_95": [
+    {
+      "n_tasks": 5,
+      "N": 1,
+      "serial_h": 1.3,
+      "e95": 14.0,
+      "e99": 20.6
+    },
+    {
+      "n_tasks": 7,
+      "N": 1,
+      "serial_h": 1.8,
+      "e95": 13.8,
+      "e99": 18.8
+    },
+    {
+      "n_tasks": 9,
+      "N": 1,
+      "serial_h": 2.0,
+      "e95": 12.3,
+      "e99": 18.0
+    },
+    {
+      "n_tasks": 10,
+      "N": 1,
+      "serial_h": 2.5,
+      "e95": 12.1,
+      "e99": 17.9
+    },
+    {
+      "n_tasks": 5,
+      "N": 2,
+      "serial_h": 2.6,
+      "e95": 11.6,
+      "e99": 17.1
+    },
+    {
+      "n_tasks": 7,
+      "N": 2,
+      "serial_h": 3.6,
+      "e95": 10.6,
+      "e99": 16.1
+    },
+    {
+      "n_tasks": 9,
+      "N": 2,
+      "serial_h": 3.9,
+      "e95": 9.9,
+      "e99": 13.9
+    },
+    {
+      "n_tasks": 6,
+      "N": 3,
+      "serial_h": 5.1,
+      "e95": 9.8,
+      "e99": 14.7
+    },
+    {
+      "n_tasks": 10,
+      "N": 2,
+      "serial_h": 5.1,
+      "e95": 9.6,
+      "e99": 13.2
+    },
+    {
+      "n_tasks": 11,
+      "N": 2,
+      "serial_h": 5.1,
+      "e95": 9.1,
+      "e99": 13.7
+    },
+    {
+      "n_tasks": 12,
+      "N": 2,
+      "serial_h": 5.2,
+      "e95": 8.8,
+      "e99": 12.6
+    },
+    {
+      "n_tasks": 13,
+      "N": 2,
+      "serial_h": 5.6,
+      "e95": 8.6,
+      "e99": 12.9
+    },
+    {
+      "n_tasks": 8,
+      "N": 3,
+      "serial_h": 6.3,
+      "e95": 8.5,
+      "e99": 12.0
+    },
+    {
+      "n_tasks": 15,
+      "N": 2,
+      "serial_h": 6.8,
+      "e95": 8.3,
+      "e99": 12.8
+    },
+    {
+      "n_tasks": 11,
+      "N": 3,
+      "serial_h": 7.7,
+      "e95": 8.0,
+      "e99": 11.8
+    },
+    {
+      "n_tasks": 12,
+      "N": 3,
+      "serial_h": 7.8,
+      "e95": 7.5,
+      "e99": 10.6
+    },
+    {
+      "n_tasks": 13,
+      "N": 3,
+      "serial_h": 8.5,
+      "e95": 7.3,
+      "e99": 11.0
+    },
+    {
+      "n_tasks": 14,
+      "N": 3,
+      "serial_h": 9.5,
+      "e95": 7.1,
+      "e99": 10.9
+    },
+    {
+      "n_tasks": 15,
+      "N": 3,
+      "serial_h": 10.1,
+      "e95": 7.0,
+      "e99": 10.7
+    },
+    {
+      "n_tasks": 12,
+      "N": 4,
+      "serial_h": 10.4,
+      "e95": 6.5,
+      "e99": 10.1
+    },
+    {
+      "n_tasks": 13,
+      "N": 4,
+      "serial_h": 11.3,
+      "e95": 6.3,
+      "e99": 9.9
+    },
+    {
+      "n_tasks": 12,
+      "N": 5,
+      "serial_h": 13.0,
+      "e95": 6.0,
+      "e99": 9.2
+    },
+    {
+      "n_tasks": 13,
+      "N": 5,
+      "serial_h": 14.1,
+      "e95": 5.9,
+      "e99": 8.7
+    },
+    {
+      "n_tasks": 15,
+      "N": 5,
+      "serial_h": 16.9,
+      "e95": 5.7,
+      "e99": 8.7
+    }
+  ],
+  "pareto_99": [
+    {
+      "n_tasks": 5,
+      "N": 1,
+      "serial_h": 1.3,
+      "e95": 14.0,
+      "e99": 20.6
+    },
+    {
+      "n_tasks": 7,
+      "N": 1,
+      "serial_h": 1.8,
+      "e95": 13.8,
+      "e99": 18.8
+    },
+    {
+      "n_tasks": 9,
+      "N": 1,
+      "serial_h": 2.0,
+      "e95": 12.3,
+      "e99": 18.0
+    },
+    {
+      "n_tasks": 10,
+      "N": 1,
+      "serial_h": 2.5,
+      "e95": 12.1,
+      "e99": 17.9
+    },
+    {
+      "n_tasks": 5,
+      "N": 2,
+      "serial_h": 2.6,
+      "e95": 11.6,
+      "e99": 17.1
+    },
+    {
+      "n_tasks": 6,
+      "N": 2,
+      "serial_h": 3.4,
+      "e95": 11.7,
+      "e99": 16.4
+    },
+    {
+      "n_tasks": 7,
+      "N": 2,
+      "serial_h": 3.6,
+      "e95": 10.6,
+      "e99": 16.1
+    },
+    {
+      "n_tasks": 5,
+      "N": 3,
+      "serial_h": 3.9,
+      "e95": 10.9,
+      "e99": 14.8
+    },
+    {
+      "n_tasks": 9,
+      "N": 2,
+      "serial_h": 3.9,
+      "e95": 9.9,
+      "e99": 13.9
+    },
+    {
+      "n_tasks": 8,
+      "N": 2,
+      "serial_h": 4.2,
+      "e95": 10.2,
+      "e99": 13.6
+    },
+    {
+      "n_tasks": 10,
+      "N": 2,
+      "serial_h": 5.1,
+      "e95": 9.6,
+      "e99": 13.2
+    },
+    {
+      "n_tasks": 12,
+      "N": 2,
+      "serial_h": 5.2,
+      "e95": 8.8,
+      "e99": 12.6
+    },
+    {
+      "n_tasks": 9,
+      "N": 3,
+      "serial_h": 5.9,
+      "e95": 8.6,
+      "e99": 11.9
+    },
+    {
+      "n_tasks": 7,
+      "N": 4,
+      "serial_h": 7.3,
+      "e95": 8.4,
+      "e99": 11.6
+    },
+    {
+      "n_tasks": 12,
+      "N": 3,
+      "serial_h": 7.8,
+      "e95": 7.5,
+      "e99": 10.6
+    },
+    {
+      "n_tasks": 9,
+      "N": 5,
+      "serial_h": 9.9,
+      "e95": 7.4,
+      "e99": 10.0
+    },
+    {
+      "n_tasks": 8,
+      "N": 5,
+      "serial_h": 10.4,
+      "e95": 7.2,
+      "e99": 9.9
+    },
+    {
+      "n_tasks": 12,
+      "N": 5,
+      "serial_h": 13.0,
+      "e95": 6.0,
+      "e99": 9.2
+    },
+    {
+      "n_tasks": 13,
+      "N": 5,
+      "serial_h": 14.1,
+      "e95": 5.9,
+      "e99": 8.7
+    }
+  ]
+}

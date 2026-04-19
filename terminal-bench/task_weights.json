@@ -1,0 +1,7 @@
+{
+  "compile-compcert": 3,
+  "circuit-fibsqrt": 3,
+  "torch-tensor-parallelism": 2,
+  "rstan-to-pystan": 3,
+  "path-tracing": 2
+}

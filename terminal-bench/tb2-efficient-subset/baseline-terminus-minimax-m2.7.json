@@ -1,0 +1,114 @@
+{
+  "id": "61deaf52-fffb-4e90-970a-fb126b151623",
+  "started_at": "2026-04-04T02:21:30.559871",
+  "finished_at": "2026-04-04T03:48:40.348856",
+  "n_total_trials": 60,
+  "stats": {
+    "n_trials": 60,
+    "n_errors": 21,
+    "evals": {
+      "terminus-2__minimax-minimax-m2.7__terminal-bench": {
+        "n_trials": 60,
+        "n_errors": 21,
+        "metrics": [
+          {
+            "mean": 0.45
+          }
+        ],
+        "reward_stats": {
+          "reward": {
+            "0.0": [
+              "circuit-fibsqrt__6Sfj2fo",
+              "circuit-fibsqrt__yfSgGUz",
+              "circuit-fibsqrt__9h458D2",
+              "circuit-fibsqrt__ZUAqHoP",
+              "circuit-fibsqrt__dQQU2GY",
+              "compile-compcert__AHbifVC",
+              "compile-compcert__NFocMTU",
+              "compile-compcert__nEuLr8n",
+              "compile-compcert__snKaaJR",
+              "compile-compcert__UpqKxAj",
+              "path-tracing__wNRJy8D",
+              "path-tracing__KhXKGXj",
+              "path-tracing__wSZEmNi",
+              "path-tracing__FZsuCZc",
+              "path-tracing__jYHMGZc",
+              "torch-tensor-parallelism__bJD3Q2U",
+              "torch-tensor-parallelism__jfFv5At",
+              "torch-tensor-parallelism__yVSUSY6",
+              "torch-tensor-parallelism__5HmY69S",
+              "rstan-to-pystan__2hLarhs",
+              "sqlite-db-truncate__icbz2n3",
+              "sqlite-db-truncate__d67eXbU",
+              "chess-best-move__n7ZmZV5",
+              "chess-best-move__aoF4pT4",
+              "chess-best-move__7XcRfza",
+              "chess-best-move__TQivwtC",
+              "chess-best-move__XtJGKE7",
+              "extract-elf__PN5Hk9X",
+              "sanitize-git-repo__UKdE6zD",
+              "sanitize-git-repo__NX3aCfB",
+              "sanitize-git-repo__puBBrM3",
+              "sanitize-git-repo__vnSFYiF",
+              "sanitize-git-repo__ppNoH2s"
+            ],
+            "1.0": [
+              "git-leak-recovery__FnsBNTd",
+              "git-leak-recovery__8RjEV3k",
+              "git-leak-recovery__ermwQRv",
+              "git-leak-recovery__Tvx8b4Q",
+              "git-leak-recovery__Y75inXx",
+              "torch-tensor-parallelism__BFuGK3q",
+              "rstan-to-pystan__o8sG2QT",
+              "rstan-to-pystan__y7RGTWw",
+              "rstan-to-pystan__ueoFV8s",
+              "rstan-to-pystan__yhyCbuR",
+              "multi-source-data-merger__wr55e7z",
+              "multi-source-data-merger__FRX73mR",
+              "multi-source-data-merger__NuheXBX",
+              "multi-source-data-merger__WRLdxXQ",
+              "multi-source-data-merger__atYVE39",
+              "sparql-university__b6QQp8J",
+              "sparql-university__htrHDsi",
+              "sparql-university__wKkWQL7",
+              "sparql-university__ekAdffy",
+              "sparql-university__XrrxjHJ",
+              "sqlite-db-truncate__cjH9efW",
+              "sqlite-db-truncate__xZ9oYB5",
+              "sqlite-db-truncate__RBSQzw9",
+              "extract-elf__ENceh5S",
+              "extract-elf__pBxzbbM",
+              "extract-elf__Veq9eqy",
+              "extract-elf__Z8ULtwX"
+            ]
+          }
+        },
+        "exception_stats": {
+          "AgentTimeoutError": [
+            "circuit-fibsqrt__6Sfj2fo",
+            "circuit-fibsqrt__yfSgGUz",
+            "circuit-fibsqrt__9h458D2",
+            "circuit-fibsqrt__ZUAqHoP",
+            "circuit-fibsqrt__dQQU2GY",
+            "compile-compcert__AHbifVC",
+            "compile-compcert__NFocMTU",
+            "compile-compcert__nEuLr8n",
+            "compile-compcert__snKaaJR",
+            "compile-compcert__UpqKxAj",
+            "path-tracing__wNRJy8D",
+            "path-tracing__KhXKGXj",
+            "path-tracing__wSZEmNi",
+            "path-tracing__FZsuCZc",
+            "path-tracing__jYHMGZc",
+            "sqlite-db-truncate__d67eXbU",
+            "chess-best-move__n7ZmZV5",
+            "chess-best-move__aoF4pT4",
+            "chess-best-move__7XcRfza",
+            "chess-best-move__TQivwtC",
+            "chess-best-move__XtJGKE7"
+          ]
+        }
+      }
+    }
+  }
+}

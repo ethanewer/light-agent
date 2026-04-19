@@ -1,0 +1,14 @@
+{
+  "circuit-fibsqrt": 1800,
+  "compile-compcert": 1200,
+  "git-leak-recovery": 1080,
+  "path-tracing": 900,
+  "torch-tensor-parallelism": 840,
+  "rstan-to-pystan": 780,
+  "multi-source-data-merger": 720,
+  "sparql-university": 660,
+  "sqlite-db-truncate": 480,
+  "chess-best-move": 360,
+  "extract-elf": 300,
+  "sanitize-git-repo": 276
+}
