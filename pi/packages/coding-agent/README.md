@@ -338,6 +338,8 @@ export default function (pi: ExtensionAPI) {
 }
 ```
 
+The default export can also be `async`. pi waits for async extension factories before startup continues, which is useful for one-time initialization such as fetching remote model lists before calling `pi.registerProvider()`.
+
 **What's possible:**
 - Custom tools (or replace built-in tools entirely)
 - Sub-agents and plan mode
