@@ -102,6 +102,13 @@ function trimTrailingEmptyLines(lines: string[]): string[] {
 	return lines.slice(0, end);
 }
 
+function getNonVisionImageNote(model: Model<Api> | undefined): string | undefined {
+	if (!model || model.input.includes("image")) {
+		return undefined;
+	}
+	return "[Current model does not support images. The image will be omitted from this request.]";
+}
+
 function formatReadResult(
 	args: { path?: string; file_path?: string; offset?: number; limit?: number } | undefined,
 	result: { content: (TextContent | ImageContent)[]; details?: ReadToolDetails },
@@ -153,7 +160,7 @@ export function createReadToolDefinition(
 			{ path, offset, limit }: { path: string; offset?: number; limit?: number },
 			signal?: AbortSignal,
 			_onUpdate?,
-			_ctx?,
+			ctx?,
 		) {
 			const absolutePath = resolveReadPath(path, cwd);
 			return new Promise<{ content: (TextContent | ImageContent)[]; details: ReadToolDetails | undefined }>(
@@ -177,6 +184,7 @@ export function createReadToolDefinition(
 							const mimeType = ops.detectImageMimeType ? await ops.detectImageMimeType(absolutePath) : undefined;
 							let content: (TextContent | ImageContent)[];
 							let details: ReadToolDetails | undefined;
+							const nonVisionImageNote = getNonVisionImageNote(ctx?.model);
 							if (mimeType) {
 								// Read image as binary.
 								const buffer = await ops.readFile(absolutePath);
@@ -187,12 +195,9 @@ export function createReadToolDefinition(
 									// Resize image if needed before sending it back to the model.
 									const resized = await resizeImage({ type: "image", data: base64, mimeType });
 									if (!resized) {
-										content = [
-											{
-												type: "text",
-												text: `Read image file [${mimeType}]\n[Image omitted: could not be resized below the inline image size limit.]`,
-											},
-										];
+										let failNote = `Read image file [${mimeType}]\n[Image omitted: could not be resized below the inline image size limit.]`;
+										if (nonVisionImageNote) failNote += `\n${nonVisionImageNote}`;
+										content = [{ type: "text", text: failNote }];
 										if (aborted) return;
 										signal?.removeEventListener("abort", onAbort);
 										resolve({ content, details });
@@ -222,6 +227,8 @@ export function createReadToolDefinition(
 										},
 									];
 								} else {
+									let textNote = `Read image file [${mimeType}]`;
+									if (nonVisionImageNote) textNote += `\n${nonVisionImageNote}`;
 									content = [
 										{
 											type: "text",

@@ -81,7 +81,7 @@ import { buildSystemPrompt } from "./system-prompt.js";
 import { type BashOperations, createLocalBashOperations } from "./tools/bash.js";
 import { createAllToolDefinitions } from "./tools/index.js";
 import { buildReadToolDescription } from "./tools/read.js";
-import { createToolDefinitionFromAgentTool, wrapToolDefinition } from "./tools/tool-definition-wrapper.js";
+import { createToolDefinitionFromAgentTool } from "./tools/tool-definition-wrapper.js";
 
 // ============================================================================
 // Skill Block Parsing
@@ -271,7 +271,7 @@ export class AgentSession {
 	private _pendingBashMessages: BashExecutionMessage[] = [];
 
 	// Extension system
-	private _extensionRunner: ExtensionRunner | undefined = undefined;
+	private _extensionRunner!: ExtensionRunner;
 	private _turnIndex = 0;
 
 	private _resourceLoader: ResourceLoader;
@@ -367,7 +367,7 @@ export class AgentSession {
 	private _installAgentToolHooks(): void {
 		this.agent.beforeToolCall = async ({ toolCall, args }) => {
 			const runner = this._extensionRunner;
-			if (!runner?.hasHandlers("tool_call")) {
+			if (!runner.hasHandlers("tool_call")) {
 				return undefined;
 			}
 
@@ -390,7 +390,7 @@ export class AgentSession {
 
 		this.agent.afterToolCall = async ({ toolCall, args, result, isError }) => {
 			const runner = this._extensionRunner;
-			if (!runner?.hasHandlers("tool_result")) {
+			if (!runner.hasHandlers("tool_result")) {
 				return undefined;
 			}
 
@@ -606,8 +606,6 @@ export class AgentSession {
 
 	/** Emit extension events based on agent events */
 	private async _emitExtensionEvent(event: AgentEvent): Promise<void> {
-		if (!this._extensionRunner) return;
-
 		if (event.type === "agent_start") {
 			this._turnIndex = 0;
 			await this._extensionRunner.emit({ type: "agent_start" });
@@ -951,7 +949,7 @@ export class AgentSession {
 			// Emit input event for extension interception (before skill/template expansion)
 			let currentText = text;
 			let currentImages = options?.images;
-			if (this._extensionRunner?.hasHandlers("input")) {
+			if (this._extensionRunner.hasHandlers("input")) {
 				const inputResult = await this._extensionRunner.emitInput(
 					currentText,
 					currentImages,
@@ -1044,32 +1042,30 @@ export class AgentSession {
 			this._pendingNextTurnMessages = [];
 
 			// Emit before_agent_start extension event
-			if (this._extensionRunner) {
-				const result = await this._extensionRunner.emitBeforeAgentStart(
-					expandedText,
-					currentImages,
-					this._baseSystemPrompt,
-				);
-				// Add all custom messages from extensions
-				if (result?.messages) {
-					for (const msg of result.messages) {
-						messages.push({
-							role: "custom",
-							customType: msg.customType,
-							content: msg.content,
-							display: msg.display,
-							details: msg.details,
-							timestamp: Date.now(),
-						});
-					}
+			const result = await this._extensionRunner.emitBeforeAgentStart(
+				expandedText,
+				currentImages,
+				this._baseSystemPrompt,
+			);
+			// Add all custom messages from extensions
+			if (result?.messages) {
+				for (const msg of result.messages) {
+					messages.push({
+						role: "custom",
+						customType: msg.customType,
+						content: msg.content,
+						display: msg.display,
+						details: msg.details,
+						timestamp: Date.now(),
+					});
 				}
-				// Apply extension-modified system prompt, or reset to base
-				if (result?.systemPrompt) {
-					this.agent.state.systemPrompt = result.systemPrompt;
-				} else {
-					// Ensure we're using the base prompt (in case previous turn had modifications)
-					this.agent.state.systemPrompt = this._baseSystemPrompt;
-				}
+			}
+			// Apply extension-modified system prompt, or reset to base
+			if (result?.systemPrompt) {
+				this.agent.state.systemPrompt = result.systemPrompt;
+			} else {
+				// Ensure we're using the base prompt (in case previous turn had modifications)
+				this.agent.state.systemPrompt = this._baseSystemPrompt;
 			}
 		} catch (error) {
 			preflightResult?.(false);
@@ -1089,8 +1085,6 @@ export class AgentSession {
 	 * Try to execute an extension command. Returns true if command was found and executed.
 	 */
 	private async _tryExecuteExtensionCommand(text: string): Promise<boolean> {
-		if (!this._extensionRunner) return false;
-
 		// Parse command name and args
 		const spaceIndex = text.indexOf(" ");
 		const commandName = spaceIndex === -1 ? text.slice(1) : text.slice(1, spaceIndex);
@@ -1138,7 +1132,7 @@ export class AgentSession {
 			return args ? `${skillBlock}\n\n${args}` : skillBlock;
 		} catch (err) {
 			// Emit error like extension commands do
-			this._extensionRunner?.emitError({
+			this._extensionRunner.emitError({
 				extensionPath: skill.filePath,
 				event: "skill_expansion",
 				error: err instanceof Error ? err.message : String(err),
@@ -1226,8 +1220,6 @@ export class AgentSession {
 	 * Throw an error if the text is an extension command.
 	 */
 	private _throwIfExtensionCommand(text: string): void {
-		if (!this._extensionRunner) return;
-
 		const spaceIndex = text.indexOf(" ");
 		const commandName = spaceIndex === -1 ? text.slice(1) : text.slice(1, spaceIndex);
 		const command = this._extensionRunner.getCommand(commandName);
@@ -1378,7 +1370,6 @@ export class AgentSession {
 		previousModel: Model<any> | undefined,
 		source: "set" | "cycle" | "restore",
 	): Promise<void> {
-		if (!this._extensionRunner) return;
 		if (modelsAreEqual(previousModel, nextModel)) return;
 		await this._extensionRunner.emit({
 			type: "model_select",
@@ -1638,7 +1629,7 @@ export class AgentSession {
 			let extensionCompaction: CompactionResult | undefined;
 			let fromExtension = false;
 
-			if (this._extensionRunner?.hasHandlers("session_before_compact")) {
+			if (this._extensionRunner.hasHandlers("session_before_compact")) {
 				const result = (await this._extensionRunner.emit({
 					type: "session_before_compact",
 					preparation,
@@ -1896,7 +1887,7 @@ export class AgentSession {
 			let extensionCompaction: CompactionResult | undefined;
 			let fromExtension = false;
 
-			if (this._extensionRunner?.hasHandlers("session_before_compact")) {
+			if (this._extensionRunner.hasHandlers("session_before_compact")) {
 				const extensionResult = (await this._extensionRunner.emit({
 					type: "session_before_compact",
 					preparation,
@@ -2048,15 +2039,13 @@ export class AgentSession {
 			this._extensionErrorListener = bindings.onError;
 		}
 
-		if (this._extensionRunner) {
-			this._applyExtensionBindings(this._extensionRunner);
-			await this._extensionRunner.emit(this._sessionStartEvent);
-			await this.extendResourcesFromExtensions(this._sessionStartEvent.reason === "reload" ? "reload" : "startup");
-		}
+		this._applyExtensionBindings(this._extensionRunner);
+		await this._extensionRunner.emit(this._sessionStartEvent);
+		await this.extendResourcesFromExtensions(this._sessionStartEvent.reason === "reload" ? "reload" : "startup");
 	}
 
 	private async extendResourcesFromExtensions(reason: "startup" | "reload"): Promise<void> {
-		if (!this._extensionRunner?.hasHandlers("resources_discover")) {
+		if (!this._extensionRunner.hasHandlers("resources_discover")) {
 			return;
 		}
 
@@ -2306,7 +2295,7 @@ export class AgentSession {
 		const previousRegistryNames = new Set(this._toolRegistry.keys());
 		const previousActiveToolNames = this.getActiveToolNames();
 
-		const registeredTools = this._extensionRunner?.getAllRegisteredTools() ?? [];
+		const registeredTools = this._extensionRunner.getAllRegisteredTools();
 		const allCustomTools = [
 			...registeredTools,
 			...this._customTools.map((definition) => ({
@@ -2346,19 +2335,17 @@ export class AgentSession {
 				})
 				.filter((entry): entry is readonly [string, string[]] => entry !== undefined),
 		);
-		const wrappedExtensionTools = this._extensionRunner
-			? wrapRegisteredTools(allCustomTools, this._extensionRunner)
-			: [];
-
-		const toolRegistry = new Map(
-			Array.from(this._baseToolDefinitions.values()).map((definition) => [
-				definition.name,
-				wrapToolDefinition(
-					definition,
-					() => this._extensionRunner?.createContext() ?? this._createBuiltInToolContext(),
-				),
-			]),
+		const runner = this._extensionRunner;
+		const wrappedExtensionTools = wrapRegisteredTools(allCustomTools, runner);
+		const wrappedBuiltInTools = wrapRegisteredTools(
+			Array.from(this._baseToolDefinitions.values()).map((definition) => ({
+				definition,
+				sourceInfo: createSyntheticSourceInfo(`<builtin:${definition.name}>`, { source: "builtin" }),
+			})),
+			runner,
 		);
+
+		const toolRegistry = new Map(wrappedBuiltInTools.map((tool) => [tool.name, tool]));
 		for (const tool of wrappedExtensionTools as AgentTool[]) {
 			toolRegistry.set(tool.name, tool);
 		}
@@ -2451,25 +2438,18 @@ export class AgentSession {
 			}
 		}
 
-		const hasExtensions = extensionsResult.extensions.length > 0;
-		const hasCustomTools = this._customTools.length > 0;
-		this._extensionRunner =
-			hasExtensions || hasCustomTools
-				? new ExtensionRunner(
-						extensionsResult.extensions,
-						extensionsResult.runtime,
-						this._cwd,
-						this.sessionManager,
-						this._modelRegistry,
-					)
-				: undefined;
+		this._extensionRunner = new ExtensionRunner(
+			extensionsResult.extensions,
+			extensionsResult.runtime,
+			this._cwd,
+			this.sessionManager,
+			this._modelRegistry,
+		);
 		if (this._extensionRunnerRef) {
 			this._extensionRunnerRef.current = this._extensionRunner;
 		}
-		if (this._extensionRunner) {
-			this._bindExtensionCore(this._extensionRunner);
-			this._applyExtensionBindings(this._extensionRunner);
-		}
+		this._bindExtensionCore(this._extensionRunner);
+		this._applyExtensionBindings(this._extensionRunner);
 
 		const defaultActiveToolNames = this._baseToolsOverride
 			? Object.keys(this._baseToolsOverride)
@@ -2482,8 +2462,8 @@ export class AgentSession {
 	}
 
 	async reload(): Promise<void> {
-		const previousFlagValues = this._extensionRunner?.getFlagValues();
-		await this._extensionRunner?.emit({ type: "session_shutdown" });
+		const previousFlagValues = this._extensionRunner.getFlagValues();
+		await this._extensionRunner.emit({ type: "session_shutdown" });
 		await this.settingsManager.reload();
 		resetApiProviders();
 		await this._resourceLoader.reload();
@@ -2498,7 +2478,7 @@ export class AgentSession {
 			this._extensionCommandContextActions ||
 			this._extensionShutdownHandler ||
 			this._extensionErrorListener;
-		if (this._extensionRunner && hasBindings) {
+		if (hasBindings) {
 			await this._extensionRunner.emit({ type: "session_start", reason: "reload" });
 			await this.extendResourcesFromExtensions("reload");
 		}
@@ -2827,7 +2807,7 @@ export class AgentSession {
 		let fromExtension = false;
 
 		// Emit session_before_tree event
-		if (this._extensionRunner?.hasHandlers("session_before_tree")) {
+		if (this._extensionRunner.hasHandlers("session_before_tree")) {
 			const result = (await this._extensionRunner.emit({
 				type: "session_before_tree",
 				preparation,
@@ -2941,15 +2921,13 @@ export class AgentSession {
 		this.agent.state.messages = sessionContext.messages;
 
 		// Emit session_tree event
-		if (this._extensionRunner) {
-			await this._extensionRunner.emit({
-				type: "session_tree",
-				newLeafId: this.sessionManager.getLeafId(),
-				oldLeafId,
-				summaryEntry,
-				fromExtension: summaryText ? fromExtension : undefined,
-			});
-		}
+		await this._extensionRunner.emit({
+			type: "session_tree",
+			newLeafId: this.sessionManager.getLeafId(),
+			oldLeafId,
+			summaryEntry,
+			fromExtension: summaryText ? fromExtension : undefined,
+		});
 
 		// Emit to custom tools
 
@@ -3181,13 +3159,13 @@ export class AgentSession {
 	 * Check if extensions have handlers for a specific event type.
 	 */
 	hasExtensionHandlers(eventType: string): boolean {
-		return this._extensionRunner?.hasHandlers(eventType) ?? false;
+		return this._extensionRunner.hasHandlers(eventType);
 	}
 
 	/**
 	 * Get the extension runner (for setting UI context and error handlers).
 	 */
-	get extensionRunner(): ExtensionRunner | undefined {
+	get extensionRunner(): ExtensionRunner {
 		return this._extensionRunner;
 	}
 }
