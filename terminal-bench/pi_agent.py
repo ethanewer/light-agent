@@ -38,6 +38,22 @@ _FORWARD_ENV_KEYS = (
     "ANTHROPIC_API_KEY",
 )
 
+# Default task-focused guidance appended to pi's interactive-oriented system prompt when
+# running on terminal-bench. Keeps the default behavior (documented tools, etc.) but nudges
+# the model to treat the instruction as a binding spec, verify its own work, and avoid
+# modifying unrelated files. Empirically raised rstan / sanitize / sparql pass-rates in
+# round-1 experiments (pre provider-pin). Override with PI_BENCH_APPEND_SYSTEM_PROMPT=""
+# or set PI_BENCH_APPEND_SYSTEM_PROMPT=<path:...> / <raw text> to customize.
+_DEFAULT_BENCH_APPEND_PROMPT = """\
+You are running a single batch task end-to-end in a sandboxed container. Follow these rules:
+- First, examine the environment (working dir, relevant files, tool versions) before acting.
+- Treat every numeric threshold, exact filename, file format, and output schema in the task as a binding hard constraint. Do not relax them.
+- When replacing values, substitute the exact value (no rounding, no reformatting) unless the task explicitly says otherwise.
+- Do not edit files that the task does not tell you to edit. Preserve everything else byte-for-byte.
+- Before declaring the task done, re-read the success criteria and verify each one against the actual produced files/output.
+- Prefer small, targeted tool calls. Read files before editing; run commands non-interactively; avoid long speculative reasoning chains when a quick tool call would resolve the question.
+"""
+
 def _resolve_bundle_dir() -> Path:
     env_dir = os.environ.get("PI_BENCH_BUNDLE_DIR")
     if env_dir:
@@ -164,6 +180,10 @@ class PiBenchAgent(HarborBaseAgent):  # type: ignore[misc]
         self.thinking: str = os.environ.get("PI_BENCH_THINKING", "high")
         self.tools: str = os.environ.get("PI_BENCH_TOOLS", "read,bash,edit,write")
         self.system_prompt: str = os.environ.get("PI_BENCH_SYSTEM_PROMPT", "")
+        # Appended to the default pi system prompt (does NOT replace it). Empty string disables.
+        self.append_system_prompt: str = os.environ.get(
+            "PI_BENCH_APPEND_SYSTEM_PROMPT", _DEFAULT_BENCH_APPEND_PROMPT
+        )
         self.extra_args: str = os.environ.get("PI_BENCH_EXTRA_ARGS", "")
         self.bundle_dir = _resolve_bundle_dir()
         self._remote_binary = f"{_REMOTE_BUNDLE_DIR}/pi-linux-arm64"
@@ -257,6 +277,10 @@ class PiBenchAgent(HarborBaseAgent):  # type: ignore[misc]
         env["PI_LOG_RUNTIME_CONFIG"] = "1"
 
         binary = getattr(self, "_remote_binary", f"{_REMOTE_BUNDLE_DIR}/pi-linux-arm64")
+        # Event stream is tee'd into pi-output.log as it streams, so the artifact captures
+        # partial traces even when the trial times out. Pi's own stdout also ends up in
+        # event_log for completeness; the tee makes the artifact copy incremental instead of
+        # waiting for pi to exit.
         log_file = "/tmp/pi-output.log"
         event_log = "/tmp/pi-events.jsonl"
         debug_log = "/tmp/pi-debug.log"
@@ -267,11 +291,17 @@ class PiBenchAgent(HarborBaseAgent):  # type: ignore[misc]
                 f"thinking={self.thinking}",
                 f"tools={self.tools}",
                 f"system_prompt_provided={'yes' if self.system_prompt else 'no'}",
+                f"append_system_prompt_chars={len(self.append_system_prompt)}",
                 f"extra_args={self.extra_args or '<none>'}",
                 "=== PI EVENT STREAM (JSONL) ===",
             ]
         )
         prompt_flag = f" --system-prompt {shlex.quote(self.system_prompt)}" if self.system_prompt else ""
+        append_prompt_flag = (
+            f" --append-system-prompt {shlex.quote(self.append_system_prompt)}"
+            if self.append_system_prompt
+            else ""
+        )
         extra_args = ""
         if self.extra_args.strip():
             extra_args = " " + " ".join(shlex.quote(arg) for arg in shlex.split(self.extra_args))
@@ -279,10 +309,9 @@ class PiBenchAgent(HarborBaseAgent):  # type: ignore[misc]
             f"cat <<'EOF' >{log_file}\n{config_block}\nEOF\n"
             f"{binary} --mode json --no-session --no-context-files --no-extensions --no-skills "
             f"--no-prompt-templates --no-themes --tools {shlex.quote(self.tools)} --thinking {shlex.quote(self.thinking)} "
-            f"--model {shlex.quote(self.model)}{prompt_flag}{extra_args} "
-            f"{shlex.quote(instruction)} >{event_log} 2>{debug_log}; "
-            "PI_EXIT=$?; "
-            f"cat {event_log} >> {log_file} 2>/dev/null; "
+            f"--model {shlex.quote(self.model)}{prompt_flag}{append_prompt_flag}{extra_args} "
+            f"{shlex.quote(instruction)} 2>{debug_log} | tee -a {log_file} >{event_log}; "
+            "PI_EXIT=${PIPESTATUS[0]}; "
             f"echo '' >> {log_file}; "
             f"echo '=== STDERR/DEBUG LOG ===' >> {log_file}; "
             f"cat {debug_log} >> {log_file} 2>/dev/null; "

@@ -745,7 +745,11 @@ async function generateModels() {
 			candidate.compat = candidate.compat ?? {};
 			candidate.compat.openRouterRouting = {
 				...(candidate.compat.openRouterRouting ?? {}),
-				only: ["minimax/fp8"],
+				// Both listed endpoints are served by MiniMax themselves at fp8 precision; their
+				// outputs are drawn from the same weights. We explicitly exclude Fireworks
+				// (unknown quantization) and Together (fp4) because switching between
+				// quantizations introduces run-to-run sampling drift.
+				only: ["minimax/fp8", "minimax/highspeed"],
 				allow_fallbacks: false,
 			};
 		}
