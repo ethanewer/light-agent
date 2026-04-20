@@ -8,6 +8,10 @@
 - Added a vision fallback for the `read` tool so agents running on text-only models can still consume image files. When the active model lacks image input but an OpenRouter auth is configured, image reads are routed through `openrouter/qwen/qwen3.6-plus` for a text description (prefixed with an `[Image analyzed with …]` note), with results cached per session keyed by `(path, mtime, size)`.
 - Added LM Studio local server auto-discovery in the CLI. Loaded models are detected from the local OpenAI-compatible endpoint and become selectable without manual `models.json` setup.
 
+### Fixed
+
+- Fixed skill resolution to dedupe symlinked aliases by canonical path, so `pi config` no longer shows duplicate skill entries when `~/.pi/agent/skills` points to `~/.agents/skills` ([#3405](https://github.com/badlogic/pi-mono/issues/3405))
+
 ## [0.67.68] - 2026-04-17
 
 ## [0.67.67] - 2026-04-17
