@@ -5,6 +5,7 @@
 ### Added
 
 - Added `Editor.prependText()` (and corresponding optional `prependText?` on the `EditorComponent` interface) for inserting text at the start of the buffer as a single undoable step, shifting the cursor forward so it stays on the same user content.
+- Added `LoaderIndicatorOptions` and `Loader.setIndicator()` support for custom loader frames and animation intervals, allowing TUI consumers to use animated, static, or hidden loader indicators ([#3413](https://github.com/badlogic/pi-mono/issues/3413))
 
 ### Fixed
 
