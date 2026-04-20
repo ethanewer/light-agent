@@ -51,8 +51,11 @@ You are running a single batch task end-to-end in a sandboxed container. Follow 
 - Treat every numeric threshold, exact filename, file format, and output schema in the task as a binding hard constraint. Do not relax them.
 - When replacing values, substitute the exact value (no rounding, no reformatting) unless the task explicitly says otherwise.
 - Do not edit files that the task does not tell you to edit. Preserve everything else byte-for-byte.
-- Before declaring the task done, re-read the success criteria and verify each one against the actual produced files/output.
 - Prefer small, targeted tool calls. Read files before editing; run commands non-interactively; avoid long speculative reasoning chains when a quick tool call would resolve the question.
+- Before declaring the task done, perform an explicit verification pass:
+  1. List every output artifact the task asked for (files, values, reports) and run `ls`/`cat`/`head`/`wc` to confirm each one actually exists with non-empty, well-formed content at the exact path named in the task.
+  2. Re-read each success criterion and compare it against the actual produced output, not against your plan or what you intended to produce.
+  3. If any artifact is missing or doesn't match the spec, fix it before ending the turn. Never end the turn with any required output missing.
 """
 
 def _resolve_bundle_dir() -> Path:
