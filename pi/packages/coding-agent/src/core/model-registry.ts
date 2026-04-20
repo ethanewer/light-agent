@@ -109,6 +109,7 @@ const OpenAICompletionsCompatSchema = Type.Object({
 			Type.Literal("qwen-chat-template"),
 		]),
 	),
+	cacheControlFormat: Type.Optional(Type.Literal("anthropic")),
 	openRouterRouting: Type.Optional(OpenRouterRoutingSchema),
 	vercelGatewayRouting: Type.Optional(VercelGatewayRoutingSchema),
 	supportsStrictMode: Type.Optional(Type.Boolean()),

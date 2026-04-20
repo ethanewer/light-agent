@@ -832,7 +832,7 @@ describe("ModelRegistry", () => {
 			}
 		});
 
-		test("compat schema accepts reasoningEffortMap and supportsStrictMode", () => {
+		test("compat schema accepts reasoningEffortMap, supportsStrictMode, and cacheControlFormat", () => {
 			writeRawModelsJson({
 				demo: {
 					baseUrl: "https://example.com/v1",
@@ -852,6 +852,7 @@ describe("ModelRegistry", () => {
 									high: "max",
 								},
 								supportsStrictMode: false,
+								cacheControlFormat: "anthropic",
 							},
 						},
 					],
@@ -864,6 +865,7 @@ describe("ModelRegistry", () => {
 			expect(registry.getError()).toBeUndefined();
 			expect(compat?.reasoningEffortMap).toEqual({ minimal: "default", high: "max" });
 			expect(compat?.supportsStrictMode).toBe(false);
+			expect(compat?.cacheControlFormat).toBe("anthropic");
 		});
 
 		test("model-level baseUrl overrides provider-level baseUrl for custom models", () => {
