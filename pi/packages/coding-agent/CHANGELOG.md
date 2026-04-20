@@ -7,6 +7,7 @@
 - Added voice input in the interactive TUI. Press space to start/stop recording and send the transcript, shift+space to transcribe in-flight audio into the editor without sending, and `/voice` to re-enter voice mode from text input. Recording uses `ffmpeg` (or `sox`'s `rec`) and transcription uses OpenAI's `/v1/audio/transcriptions` endpoint via the configured `openai` provider credentials and base URL.
 - Added a vision fallback for the `read` tool so agents running on text-only models can still consume image files. When the active model lacks image input but an OpenRouter auth is configured, image reads are routed through `openrouter/qwen/qwen3.6-plus` for a text description (prefixed with an `[Image analyzed with …]` note), with results cached per session keyed by `(path, mtime, size)`.
 - Added LM Studio local server auto-discovery in the CLI. Loaded models are detected from the local OpenAI-compatible endpoint and become selectable without manual `models.json` setup.
+- Added extension support for customizing the interactive streaming working indicator via `ctx.ui.setWorkingIndicator()`, including custom animated frames, static indicators, hidden indicators, a new `working-indicator.ts` example extension, and updated extension/TUI/RPC docs ([#3413](https://github.com/badlogic/pi-mono/issues/3413))
 - Added `/clone` to duplicate the current active branch into a new session, while keeping `/fork` focused on forking from a previous user message ([#2962](https://github.com/badlogic/pi-mono/issues/2962))
 
 ### Fixed
