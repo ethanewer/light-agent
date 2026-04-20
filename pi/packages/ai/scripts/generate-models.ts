@@ -724,6 +724,31 @@ async function generateModels() {
 			candidate.cost.cacheRead = 0.119;
 		}
 
+		// minimax/minimax-m2.7 on OpenRouter has two issues we correct here:
+		//
+		// 1. OpenRouter reports maxTokens=4096, but the underlying model supports ~131K output
+		//    tokens. For a reasoning model with large "thinking" budgets the 4K cap produces
+		//    stopReason="length" mid-turn (no visible assistant text ever emitted). Bump to the
+		//    native capacity; buildBaseOptions still clamps per-request to 32000 by default.
+		//
+		// 2. OpenRouter routes across four backends (Fireworks [unknown quant], Together [fp4],
+		//    Minimax [fp8], Minimax highspeed [fp8]) — they return meaningfully different outputs
+		//    for the same prompt, causing high run-to-run variance. Pin to the official Minimax
+		//    provider (fp8) so we always hit the canonical, highest-precision weights.
+		if (
+			candidate.provider === "openrouter" &&
+			(candidate.id === "minimax/minimax-m2.7" || candidate.id === "minimax/minimax-m2.7-highspeed")
+		) {
+			if (!candidate.maxTokens || candidate.maxTokens < 32768) {
+				candidate.maxTokens = 131072;
+			}
+			candidate.compat = candidate.compat ?? {};
+			candidate.compat.openRouterRouting = {
+				...(candidate.compat.openRouterRouting ?? {}),
+				only: ["minimax/fp8"],
+				allow_fallbacks: false,
+			};
+		}
 	}
 
 
