@@ -7,6 +7,7 @@ import importlib
 import inspect
 import json
 import os
+import random
 import shlex
 from pathlib import Path
 from typing import Any
@@ -251,6 +252,19 @@ class PiBenchAgent(HarborBaseAgent):  # type: ignore[misc]
         environment: Any,
         context: Any,
     ) -> None:
+        # When the bench launches N concurrent trials they all hit the (single, pinned)
+        # OpenRouter Minimax fp8 endpoint within the same ~5s window, which empirically
+        # causes the endpoint to return finish_reason=stop with no content for ~10-20% of
+        # the burst (verified via timestamps in pi-output.log). Spread the launches over
+        # a few seconds so each trial's first request lands in a quieter window.
+        # Configurable via PI_BENCH_STARTUP_JITTER_SEC (set to 0 to disable).
+        try:
+            max_jitter = float(os.environ.get("PI_BENCH_STARTUP_JITTER_SEC", "15"))
+        except ValueError:
+            max_jitter = 15.0
+        if max_jitter > 0:
+            await asyncio.sleep(random.uniform(0, max_jitter))
+
         instruction = instruction.strip()
         if not instruction:
             _set_result(
@@ -305,17 +319,47 @@ class PiBenchAgent(HarborBaseAgent):  # type: ignore[misc]
         extra_args = ""
         if self.extra_args.strip():
             extra_args = " " + " ".join(shlex.quote(arg) for arg in shlex.split(self.extra_args))
-        command = (
-            f"cat <<'EOF' >{log_file}\n{config_block}\nEOF\n"
+
+        try:
+            max_empty_retries = int(os.environ.get("PI_BENCH_MAX_EMPTY_RETRIES", "3"))
+        except ValueError:
+            max_empty_retries = 3
+
+        # Build the pi invocation once; retry loop re-runs it up to max_empty_retries when
+        # the provider returns an anomalous empty response (finish_reason=stop with zero
+        # content/usage on the very first turn). This is a transient OpenRouter/Minimax
+        # issue under concurrent load; a short backoff usually clears it.
+        pi_cmd = (
             f"{binary} --mode json --no-session --no-context-files --no-extensions --no-skills "
             f"--no-prompt-templates --no-themes --tools {shlex.quote(self.tools)} --thinking {shlex.quote(self.thinking)} "
             f"--model {shlex.quote(self.model)}{prompt_flag}{append_prompt_flag}{extra_args} "
-            f"{shlex.quote(instruction)} 2>{debug_log} | tee -a {log_file} >{event_log}; "
-            "PI_EXIT=${PIPESTATUS[0]}; "
-            f"echo '' >> {log_file}; "
-            f"echo '=== STDERR/DEBUG LOG ===' >> {log_file}; "
-            f"cat {debug_log} >> {log_file} 2>/dev/null; "
-            'echo "pi exited with code $PI_EXIT"; '
+            f"{shlex.quote(instruction)}"
+        )
+        command = (
+            f"cat <<'EOF' >{log_file}\n{config_block}\nEOF\n"
+            f"MAX_RETRIES={max_empty_retries}; ATTEMPT=0; PI_EXIT=0;\n"
+            f"while :; do\n"
+            f"  ATTEMPT=$((ATTEMPT+1));\n"
+            f"  : > {event_log}; : > {debug_log};\n"
+            f"  {pi_cmd} 2>{debug_log} | tee -a {log_file} >{event_log};\n"
+            f"  PI_EXIT=${{PIPESTATUS[0]}};\n"
+            # Detect the "empty response" anomaly: pi exited cleanly but emitted no
+            # real assistant activity (no thinking, text, or tool calls). Any of those
+            # tokens in the event stream means pi did productive work.
+            f"  if [ \"$PI_EXIT\" = \"0\" ] && ! grep -q -E '\"(thinking_start|text_start|toolcall_start)\"' {event_log}; then\n"
+            f"    if [ \"$ATTEMPT\" -lt \"$MAX_RETRIES\" ]; then\n"
+            f"      echo \"\" >> {log_file};\n"
+            f"      echo \"=== EMPTY RESPONSE DETECTED (attempt $ATTEMPT), retrying ===\" >> {log_file};\n"
+            f"      sleep $((RANDOM % 10 + 5));\n"
+            f"      continue;\n"
+            f"    fi;\n"
+            f"  fi;\n"
+            f"  break;\n"
+            f"done;\n"
+            f"echo '' >> {log_file};\n"
+            f"echo '=== STDERR/DEBUG LOG ===' >> {log_file};\n"
+            f"cat {debug_log} >> {log_file} 2>/dev/null;\n"
+            'echo "pi exited with code $PI_EXIT (attempts=$ATTEMPT)";\n'
             "exit $PI_EXIT"
         )
 
