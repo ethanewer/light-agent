@@ -6,6 +6,10 @@
 
 - Added `Editor.prependText()` (and corresponding optional `prependText?` on the `EditorComponent` interface) for inserting text at the start of the buffer as a single undoable step, shifting the cursor forward so it stays on the same user content.
 
+### Fixed
+
+- Fixed xterm `modifyOtherKeys` printable input so shifted uppercase letters insert correctly in the editor and shifted letter bindings parse and match consistently ([#3436](https://github.com/badlogic/pi-mono/issues/3436))
+
 ## [0.67.68] - 2026-04-17
 
 ## [0.67.67] - 2026-04-17
