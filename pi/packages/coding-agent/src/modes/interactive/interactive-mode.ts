@@ -2495,6 +2495,11 @@ export class InteractiveMode {
 				this.editor.setText("");
 				return;
 			}
+			if (text === "/clone") {
+				this.editor.setText("");
+				await this.handleCloneCommand();
+				return;
+			}
 			if (text === "/tree") {
 				this.showTreeSelector();
 				this.editor.setText("");
@@ -4320,7 +4325,6 @@ export class InteractiveMode {
 	}
 
 	private showUserMessageSelector(): void {
-		const duplicateSessionOptionId = "__duplicate_session__";
 		const userMessages = this.session.getUserMessagesForForking();
 
 		if (userMessages.length === 0) {
@@ -4328,28 +4332,14 @@ export class InteractiveMode {
 			return;
 		}
 
-		const selectableEntries = [
-			...userMessages.map((m) => ({ id: m.entryId, text: m.text })),
-			{ id: duplicateSessionOptionId, text: "Duplicate session" },
-		];
 		const initialSelectedId = userMessages[userMessages.length - 1]?.entryId;
 
 		this.showSelector((done) => {
 			const selector = new UserMessageSelectorComponent(
-				selectableEntries,
+				userMessages.map((m) => ({ id: m.entryId, text: m.text })),
 				async (entryId) => {
 					try {
-						let result: { cancelled: boolean; selectedText?: string };
-						if (entryId === duplicateSessionOptionId) {
-							const leafId = this.sessionManager.getLeafId();
-							if (!leafId) {
-								throw new Error("Cannot duplicate session: no current entry selected");
-							}
-							result = await this.runtimeHost.fork(leafId, { position: "at" });
-						} else {
-							result = await this.runtimeHost.fork(entryId);
-						}
-
+						const result = await this.runtimeHost.fork(entryId);
 						if (result.cancelled) {
 							done();
 							this.ui.requestRender();
@@ -4360,7 +4350,7 @@ export class InteractiveMode {
 						this.renderCurrentSessionState();
 						this.editor.setText(result.selectedText ?? "");
 						done();
-						this.showStatus("Branched to new session");
+						this.showStatus("Forked to new session");
 					} catch (error: unknown) {
 						done();
 						this.showError(error instanceof Error ? error.message : String(error));
@@ -4374,6 +4364,29 @@ export class InteractiveMode {
 			);
 			return { component: selector, focus: selector.getMessageList() };
 		});
+	}
+
+	private async handleCloneCommand(): Promise<void> {
+		const leafId = this.sessionManager.getLeafId();
+		if (!leafId) {
+			this.showStatus("Nothing to clone yet");
+			return;
+		}
+
+		try {
+			const result = await this.runtimeHost.fork(leafId, { position: "at" });
+			if (result.cancelled) {
+				this.ui.requestRender();
+				return;
+			}
+
+			await this.handleRuntimeSessionChange();
+			this.renderCurrentSessionState();
+			this.editor.setText("");
+			this.showStatus("Cloned to new session");
+		} catch (error: unknown) {
+			this.showError(error instanceof Error ? error.message : String(error));
+		}
 	}
 
 	private showTreeSelector(initialSelectedId?: string): void {
