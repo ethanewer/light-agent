@@ -808,6 +808,19 @@ export class AgentSession {
 		this.agent.state.systemPrompt = this._baseSystemPrompt;
 	}
 
+	/**
+	 * Override the base system prompt with a raw string.
+	 *
+	 * Bypasses the normal prompt-building pipeline (tool snippets, skills,
+	 * context files, etc.). The override persists until the next call to
+	 * `setActiveToolsByName`, which rebuilds the prompt from scratch.
+	 * Changes take effect on the next agent turn.
+	 */
+	setSystemPrompt(prompt: string): void {
+		this._baseSystemPrompt = prompt;
+		this.agent.state.systemPrompt = prompt;
+	}
+
 	/** Whether compaction or branch summarization is currently running */
 	get isCompacting(): boolean {
 		return (

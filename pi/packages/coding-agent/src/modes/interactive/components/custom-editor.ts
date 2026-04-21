@@ -38,6 +38,12 @@ export class CustomEditor extends Editor {
 	 * (blinking cursor).
 	 */
 	public placeholderLine?: () => string | undefined;
+	/**
+	 * Optional Tab handler invoked when the user presses Tab on a completely
+	 * empty editor with no autocomplete active. Return `true` to consume the
+	 * key; return `false` (or leave unset) for normal tab behavior.
+	 */
+	public onTab?: () => boolean;
 
 	constructor(tui: TUI, theme: EditorTheme, keybindings: KeybindingsManager, options?: EditorOptions) {
 		super(tui, theme, options);
@@ -84,6 +90,20 @@ export class CustomEditor extends Editor {
 	}
 
 	handleInput(data: string): void {
+		// Empty-editor Tab hook runs before the voice hook so tab in the
+		// "voice idle" state (before recording) can be intercepted without
+		// first dropping out of voice mode. Only fires when the buffer is
+		// empty and autocomplete isn't active, so normal tab completion and
+		// literal-tab insertion are untouched.
+		if (
+			this.onTab &&
+			this.keybindings.matches(data, "tui.input.tab") &&
+			this.getText().length === 0 &&
+			!this.isShowingAutocomplete()
+		) {
+			if (this.onTab()) return;
+		}
+
 		// Voice-mode hook runs before any other input handling so it can
 		// intercept space / ctrl+space / shift+space (and exit voice mode on
 		// other keys) without conflicting with registered app actions.

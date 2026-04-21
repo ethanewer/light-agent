@@ -1,5 +1,11 @@
 # Changelog
 
+## [Unreleased]
+
+### Added
+
+- Added Tab-to-cycle agent modes in the interactive TUI. Pressing Tab on an empty editor now cycles through declarative personas (currently `general` and `chat`), each of which can pin a specific tool set and/or override the system prompt. The `general` mode preserves whatever tool set the session was configured with, and cycling back restores it. Added `AgentSession.setSystemPrompt()` for raw system-prompt overrides, and a `CustomEditor.onTab` hook that fires only when the buffer is empty and autocomplete is inactive, so normal tab completion and literal tab insertion are unaffected.
+
 ## [0.68.0] - 2026-04-20
 
 ### New Features
