@@ -2,7 +2,7 @@
 
 import { supportsXhigh } from "../pi/packages/ai/dist/models.js";
 import { MODELS } from "../pi/packages/ai/dist/models.generated.js";
-import { allTools } from "../pi/packages/coding-agent/dist/core/tools/index.js";
+import { allToolNames } from "../pi/packages/coding-agent/dist/core/tools/index.js";
 
 const VALID_THINKING_LEVELS = new Set(["off", "minimal", "low", "medium", "high", "xhigh"]);
 
@@ -60,7 +60,7 @@ if (!VALID_THINKING_LEVELS.has(thinking)) {
 	fail(`Invalid PI_BENCH_THINKING "${thinking}". Valid values: ${Array.from(VALID_THINKING_LEVELS).join(", ")}`);
 }
 
-const availableTools = new Set(Object.keys(allTools));
+const availableTools = allToolNames;
 const requestedTools = toolsCsv
 	.split(",")
 	.map((tool) => tool.trim())
