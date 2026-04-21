@@ -26,8 +26,14 @@ import { AuthStorage } from "./core/auth-storage.js";
 import { exportFromFile } from "./core/export-html/index.js";
 import type { ExtensionFactory } from "./core/extensions/types.js";
 import { KeybindingsManager } from "./core/keybindings.js";
+import { LM_STUDIO_PROVIDER } from "./core/lmstudio-discovery.js";
 import type { ModelRegistry } from "./core/model-registry.js";
-import { resolveCliModel, resolveModelScope, type ScopedModel } from "./core/model-resolver.js";
+import {
+	patternReferencesProvider,
+	resolveCliModel,
+	resolveModelScope,
+	type ScopedModel,
+} from "./core/model-resolver.js";
 import { restoreStdout, takeOverStdout } from "./core/output-guard.js";
 import type { CreateAgentSessionOptions } from "./core/sdk.js";
 import {
@@ -554,6 +560,19 @@ export async function main(args: string[], options?: MainOptions) {
 			},
 		});
 		const { settingsManager, modelRegistry, resourceLoader } = services;
+		const existingSession = sessionManager.buildSessionContext();
+		const enabledModelPatterns = parsed.models ?? settingsManager.getEnabledModels();
+		const listModelsPattern = typeof parsed.listModels === "string" ? parsed.listModels : undefined;
+		const shouldLoadLmStudioModels =
+			parsed.provider === LM_STUDIO_PROVIDER ||
+			patternReferencesProvider(parsed.model, LM_STUDIO_PROVIDER) ||
+			patternReferencesProvider(listModelsPattern, LM_STUDIO_PROVIDER) ||
+			enabledModelPatterns?.some((pattern) => patternReferencesProvider(pattern, LM_STUDIO_PROVIDER)) ||
+			settingsManager.getDefaultProvider() === LM_STUDIO_PROVIDER ||
+			existingSession.model?.provider === LM_STUDIO_PROVIDER;
+		if (shouldLoadLmStudioModels) {
+			await modelRegistry.loadAutoDetectedProviders();
+		}
 		const diagnostics: AgentSessionRuntimeDiagnostic[] = [
 			...services.diagnostics,
 			...collectSettingsDiagnostics(settingsManager, "runtime creation"),
@@ -563,7 +582,7 @@ export async function main(args: string[], options?: MainOptions) {
 			})),
 		];
 
-		const modelPatterns = parsed.models ?? settingsManager.getEnabledModels();
+		const modelPatterns = enabledModelPatterns;
 		const scopedModels =
 			modelPatterns && modelPatterns.length > 0 ? await resolveModelScope(modelPatterns, modelRegistry) : [];
 		const {

@@ -40,6 +40,14 @@ cd pi/packages/<pkg>
 npx tsx ../../node_modules/vitest/dist/cli.js --run test/<file>.test.ts
 ```
 
+## Runtime verification
+
+For CLI, TUI, or local-provider changes, do not stop at unit tests. Verify the real behavior before claiming a fix:
+
+- run the local CLI (`./run-local-cli.sh ...`) and inspect the output
+- if the bug involves interactive behavior, drive the real TUI with `tmux` and capture the pane
+- if the bug depends on a local server (for example LM Studio), inspect the live endpoint payloads as well as the CLI output
+
 ## Don't run
 
 `npm run dev`, `npm run build`, and repo-root `npm test` — slow, network-dependent, or never exit.

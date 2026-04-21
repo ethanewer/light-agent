@@ -123,9 +123,12 @@ For each built-in provider, pi maintains a list of tool-capable models, updated 
 - Kimi For Coding
 - MiniMax
 
+**Local servers:**
+- LM Studio loaded models are auto-detected from the local OpenAI-compatible server on `http://127.0.0.1:1234/v1` (override with `LMSTUDIO_BASE_URL`)
+
 See [docs/providers.md](docs/providers.md) for detailed setup instructions.
 
-**Custom providers & models:** Add providers via `~/.pi/agent/models.json` if they speak a supported API (OpenAI, Anthropic, Google). For custom APIs or OAuth, use extensions. See [docs/models.md](docs/models.md) and [docs/custom-provider.md](docs/custom-provider.md).
+**Custom providers & models:** Add providers via `~/.pi/agent/models.json` if they speak a supported API (OpenAI, Anthropic, Google). LM Studio usually does not need manual configuration anymore unless you want custom overrides or a fully manual setup. For custom APIs or OAuth, use extensions. See [docs/models.md](docs/models.md) and [docs/custom-provider.md](docs/custom-provider.md).
 
 ---
 

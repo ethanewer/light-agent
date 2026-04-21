@@ -44,6 +44,23 @@ export interface ScopedModel {
 }
 
 /**
+ * Returns true when a model-selection pattern (a CLI flag value, a single entry from
+ * `settings.enabledModels`, a search input, etc.) references the given provider.
+ * Matches bare provider names ("lmstudio") and provider-qualified patterns
+ * ("lmstudio/gpt-oss-20b", "lmstudio/*"). Case-insensitive.
+ */
+export function patternReferencesProvider(pattern: string | undefined, provider: string): boolean {
+	if (!pattern) return false;
+	const normalizedPattern = pattern.trim().toLowerCase();
+	const normalizedProvider = provider.toLowerCase();
+	return (
+		normalizedPattern === normalizedProvider ||
+		normalizedPattern.startsWith(`${normalizedProvider}/`) ||
+		normalizedPattern.includes(`${normalizedProvider}/`)
+	);
+}
+
+/**
  * Helper to check if a model ID looks like an alias (no date suffix)
  * Dates are typically in format: -20241022 or -20250929
  */

@@ -2,6 +2,8 @@
 
 Add custom providers and models (Ollama, vLLM, LM Studio, proxies) via `~/.pi/agent/models.json`.
 
+LM Studio note: if the local LM Studio OpenAI-compatible server is running, pi auto-detects its loaded models from `http://127.0.0.1:1234/v1/models` by default, so `models.json` is usually only needed for non-default endpoints or custom overrides. Set `LMSTUDIO_BASE_URL` to change the auto-detected server URL.
+
 ## Table of Contents
 
 - [Minimal Example](#minimal-example)

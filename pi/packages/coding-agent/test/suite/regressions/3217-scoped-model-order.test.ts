@@ -60,6 +60,94 @@ describe("issue #3217 scoped model ordering", () => {
 		expect(changes).toEqual([[orderedIds[1], orderedIds[0], orderedIds[2]]]);
 	});
 
+	it("shows readable LM Studio variant labels next to model ids", async () => {
+		const harness = await createHarness();
+		harnesses.push(harness);
+
+		const model = {
+			id: "qwen-3.5-9b#mlx-8-bit",
+			name: "Qwen 3.5 9B (MLX, 8-bit)",
+			api: "openai-completions",
+			provider: "lmstudio",
+			baseUrl: "http://127.0.0.1:1234/v1",
+			reasoning: true,
+			input: ["text"] as ("text" | "image")[],
+			cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0 },
+			contextWindow: 128000,
+			maxTokens: 8192,
+		};
+		const selector = new ModelSelectorComponent(
+			createFakeTui(),
+			model,
+			harness.settingsManager,
+			harness.session.modelRegistry,
+			[{ model }],
+			() => {},
+			() => {},
+		);
+
+		await waitForAsyncRender();
+
+		const rendered = stripAnsi(selector.render(160).join("\n"));
+		expect(rendered).toContain("qwen-3.5-9b#mlx-8-bit [lmstudio] — Qwen 3.5 9B (MLX, 8-bit)");
+	});
+
+	it("lazy-loads LM Studio models only after an lmstudio search", async () => {
+		const harness = await createHarness({
+			models: [{ id: "faux-1", name: "One", reasoning: true }],
+		});
+		harnesses.push(harness);
+
+		const currentModel = harness.getModel("faux-1")!;
+		const lmStudioModel = {
+			id: "gpt-oss-20b",
+			name: "GPT OSS 20B",
+			api: "openai-completions",
+			provider: "lmstudio",
+			baseUrl: "http://127.0.0.1:1234/v1",
+			reasoning: true,
+			input: ["text"] as ("text" | "image")[],
+			cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0 },
+			contextWindow: 128000,
+			maxTokens: 8192,
+		};
+		let availableModels: Array<typeof currentModel | typeof lmStudioModel> = [currentModel];
+		let loadCalls = 0;
+		const fakeRegistry = {
+			getAvailable: () => availableModels,
+			find: (provider: string, id: string) =>
+				availableModels.find((model) => model.provider === provider && model.id === id),
+			refresh: () => {},
+			loadAutoDetectedProviders: async () => {
+				loadCalls += 1;
+				availableModels = [currentModel, lmStudioModel];
+			},
+			getError: () => undefined,
+		} as unknown as typeof harness.session.modelRegistry;
+		const selector = new ModelSelectorComponent(
+			createFakeTui(),
+			currentModel,
+			harness.settingsManager,
+			fakeRegistry,
+			[],
+			() => {},
+			() => {},
+		);
+
+		await waitForAsyncRender();
+		expect(loadCalls).toBe(0);
+
+		for (const char of "lmstudio") {
+			selector.handleInput(char);
+		}
+		await waitForAsyncRender();
+		await waitForAsyncRender();
+
+		expect(loadCalls).toBe(1);
+		const rendered = stripAnsi(selector.render(160).join("\n"));
+		expect(rendered).toContain("gpt-oss-20b [lmstudio]");
+	});
+
 	it("preserves scoped model order in the /model scoped tab", async () => {
 		const harness = await createHarness({
 			models: [

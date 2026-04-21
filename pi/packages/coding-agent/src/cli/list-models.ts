@@ -5,6 +5,7 @@
 import type { Api, Model } from "@mariozechner/pi-ai";
 import { fuzzyFilter } from "@mariozechner/pi-tui";
 import chalk from "chalk";
+import { LM_STUDIO_PROVIDER } from "../core/lmstudio-discovery.js";
 import type { ModelRegistry } from "../core/model-registry.js";
 
 /**
@@ -20,6 +21,20 @@ function formatTokenCount(count: number): string {
 		return thousands % 1 === 0 ? `${thousands}K` : `${thousands.toFixed(1)}K`;
 	}
 	return count.toString();
+}
+
+function shouldShowLmStudioLabel(model: Model<Api>): boolean {
+	return model.provider === LM_STUDIO_PROVIDER && model.name !== model.id;
+}
+
+function getDisplayModelLabel(model: Model<Api>): string {
+	return shouldShowLmStudioLabel(model) ? `${model.name} (${model.id})` : model.id;
+}
+
+function getSearchText(model: Model<Api>): string {
+	return shouldShowLmStudioLabel(model)
+		? `${model.provider} ${model.id} ${model.name}`
+		: `${model.provider} ${model.id}`;
 }
 
 /**
@@ -41,7 +56,7 @@ export async function listModels(modelRegistry: ModelRegistry, searchPattern?: s
 	// Apply fuzzy filter if search pattern provided
 	let filteredModels: Model<Api>[] = models;
 	if (searchPattern) {
-		filteredModels = fuzzyFilter(models, searchPattern, (m) => `${m.provider} ${m.id}`);
+		filteredModels = fuzzyFilter(models, searchPattern, getSearchText);
 	}
 
 	if (filteredModels.length === 0) {
@@ -59,7 +74,7 @@ export async function listModels(modelRegistry: ModelRegistry, searchPattern?: s
 	// Calculate column widths
 	const rows = filteredModels.map((m) => ({
 		provider: m.provider,
-		model: m.id,
+		model: getDisplayModelLabel(m),
 		context: formatTokenCount(m.contextWindow),
 		maxOut: formatTokenCount(m.maxTokens),
 		thinking: m.reasoning ? "yes" : "no",

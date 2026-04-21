@@ -4,26 +4,34 @@ import { join } from "node:path";
 import type { Api, Context, Model, OpenAICompletionsCompat } from "@mariozechner/pi-ai";
 import { getApiProvider } from "@mariozechner/pi-ai";
 import { getOAuthProvider } from "@mariozechner/pi-ai/oauth";
-import { afterEach, beforeEach, describe, expect, test } from "vitest";
+import { afterEach, beforeEach, describe, expect, test, vi } from "vitest";
 import { AuthStorage } from "../src/core/auth-storage.js";
+import { clearLmStudioDiscoveryCache, LM_STUDIO_REQUEST_MODEL_ID_HEADER } from "../src/core/lmstudio-discovery.js";
 import { clearApiKeyCache, ModelRegistry } from "../src/core/model-registry.js";
 
 describe("ModelRegistry", () => {
 	let tempDir: string;
 	let modelsJsonPath: string;
 	let authStorage: AuthStorage;
+	let originalFetch: typeof globalThis.fetch;
 
 	beforeEach(() => {
 		tempDir = join(tmpdir(), `pi-test-model-registry-${Date.now()}-${Math.random().toString(36).slice(2)}`);
 		mkdirSync(tempDir, { recursive: true });
 		modelsJsonPath = join(tempDir, "models.json");
 		authStorage = AuthStorage.create(join(tempDir, "auth.json"));
+		originalFetch = globalThis.fetch;
 	});
 
 	afterEach(() => {
 		if (tempDir && existsSync(tempDir)) {
 			rmSync(tempDir, { recursive: true });
 		}
+		globalThis.fetch = originalFetch;
+		delete process.env.LMSTUDIO_BASE_URL;
+		delete process.env.LM_STUDIO_BASE_URL;
+		delete process.env.PI_OFFLINE;
+		clearLmStudioDiscoveryCache();
 		clearApiKeyCache();
 	});
 
@@ -87,6 +95,456 @@ describe("ModelRegistry", () => {
 	const emptyContext: Context = {
 		messages: [],
 	};
+
+	describe("LM Studio auto-detection", () => {
+		test("discovers loaded LM Studio models and makes them available", async () => {
+			globalThis.fetch = vi.fn().mockResolvedValue(
+				new Response(
+					JSON.stringify({
+						data: [
+							{ id: "gpt-oss-20b", context_length: 131072, max_tokens: 8192 },
+							{ id: "qwen2.5-coder-7b-instruct" },
+						],
+					}),
+					{ status: 200, headers: { "content-type": "application/json" } },
+				),
+			);
+
+			const registry = ModelRegistry.create(authStorage, modelsJsonPath);
+			await registry.loadAutoDetectedProviders({ force: true });
+
+			const gptOss = registry.find("lmstudio", "gpt-oss-20b");
+			expect(gptOss).toBeDefined();
+			expect(gptOss?.baseUrl).toBe("http://127.0.0.1:1234/v1");
+			expect(gptOss?.reasoning).toBe(true);
+			expect(gptOss?.contextWindow).toBe(131072);
+			expect(gptOss?.maxTokens).toBe(8192);
+			const compat = gptOss?.compat as OpenAICompletionsCompat | undefined;
+			expect(compat?.supportsDeveloperRole).toBe(false);
+			expect(compat?.supportsReasoningEffort).toBe(false);
+			expect(compat?.supportsStrictMode).toBe(false);
+			expect(compat?.maxTokensField).toBe("max_tokens");
+			expect(registry.getAvailable().some((model) => model.provider === "lmstudio")).toBe(true);
+
+			const auth = await registry.getApiKeyAndHeaders(gptOss!);
+			expect(auth).toEqual({ ok: true, apiKey: "lmstudio", headers: undefined });
+		});
+
+		test("keeps distinct runnable lmstudio variants and filters out embedding models", async () => {
+			globalThis.fetch = vi.fn().mockResolvedValue(
+				new Response(
+					JSON.stringify({
+						data: [
+							{
+								id: "quinn-3.5-9b",
+								identifier: "quinn-3.5-9b-gguf-q4",
+								compatibility_type: "gguf",
+								quantization: "4-bit",
+								name: "Quinn 3.5 9B",
+							},
+							{
+								id: "quinn-3.5-9b",
+								identifier: "quinn-3.5-9b-gguf-q8",
+								compatibility_type: "gguf",
+								quantization: "8-bit",
+								name: "Quinn 3.5 9B",
+							},
+							{
+								id: "quinn-3.5-9b",
+								identifier: "quinn-3.5-9b-mlx-q4",
+								compatibility_type: "mlx",
+								quantization: "4-bit",
+								name: "Quinn 3.5 9B",
+							},
+							{
+								id: "quinn-3.5-9b",
+								identifier: "quinn-3.5-9b-mlx-q8",
+								compatibility_type: "mlx",
+								quantization: "8-bit",
+								name: "Quinn 3.5 9B",
+							},
+							{
+								id: "nomic-embed-text-v1.5",
+								type: "embedding",
+								name: "Nomic Embed Text v1.5",
+							},
+						],
+					}),
+					{ status: 200, headers: { "content-type": "application/json" } },
+				),
+			);
+
+			const registry = ModelRegistry.create(authStorage, modelsJsonPath);
+			await registry.loadAutoDetectedProviders({ force: true });
+
+			const availableLmStudioModels = registry.getAvailable().filter((model) => model.provider === "lmstudio");
+			expect(availableLmStudioModels.map((model) => model.id)).toEqual([
+				"quinn-3.5-9b-gguf-q4",
+				"quinn-3.5-9b-gguf-q8",
+				"quinn-3.5-9b-mlx-q4",
+				"quinn-3.5-9b-mlx-q8",
+			]);
+			expect(availableLmStudioModels.map((model) => model.name)).toEqual([
+				"Quinn 3.5 9B (GGUF, 4-bit)",
+				"Quinn 3.5 9B (GGUF, 8-bit)",
+				"Quinn 3.5 9B (MLX, 4-bit)",
+				"Quinn 3.5 9B (MLX, 8-bit)",
+			]);
+			expect(registry.find("lmstudio", "nomic-embed-text-v1.5")).toBeUndefined();
+			expect(availableLmStudioModels.every((model) => model.input.includes("text"))).toBe(true);
+			expect(availableLmStudioModels.every((model) => !model.id.includes("embed"))).toBe(true);
+		});
+
+		test("creates stable aliases for duplicate lmstudio ids without a backend identifier", async () => {
+			globalThis.fetch = vi.fn().mockResolvedValue(
+				new Response(
+					JSON.stringify({
+						data: [
+							{
+								id: "quinn-3.5-9b",
+								compatibility_type: "gguf",
+								quantization: "4-bit",
+								name: "Quinn 3.5 9B",
+							},
+							{
+								id: "quinn-3.5-9b",
+								compatibility_type: "mlx",
+								quantization: "8-bit",
+								name: "Quinn 3.5 9B",
+							},
+						],
+					}),
+					{ status: 200, headers: { "content-type": "application/json" } },
+				),
+			);
+
+			const registry = ModelRegistry.create(authStorage, modelsJsonPath);
+			await registry.loadAutoDetectedProviders({ force: true });
+
+			const gguf = registry.find("lmstudio", "quinn-3.5-9b#gguf-4-bit");
+			const mlx = registry.find("lmstudio", "quinn-3.5-9b#mlx-8-bit");
+			expect(gguf).toBeDefined();
+			expect(mlx).toBeDefined();
+			expect(gguf?.headers?.[LM_STUDIO_REQUEST_MODEL_ID_HEADER]).toBe("quinn-3.5-9b");
+			expect(mlx?.headers?.[LM_STUDIO_REQUEST_MODEL_ID_HEADER]).toBe("quinn-3.5-9b");
+		});
+
+		test("keeps gguf quantizations for the same qwen model discoverable as separate choices", async () => {
+			globalThis.fetch = vi.fn().mockResolvedValue(
+				new Response(
+					JSON.stringify({
+						data: [
+							{
+								id: "qwen-3.5-9b",
+								compatibility_type: "gguf",
+								quantization: "4-bit",
+								name: "Qwen 3.5 9B",
+							},
+							{
+								id: "qwen-3.5-9b",
+								compatibility_type: "gguf",
+								quantization: "8-bit",
+								name: "Qwen 3.5 9B",
+							},
+						],
+					}),
+					{ status: 200, headers: { "content-type": "application/json" } },
+				),
+			);
+
+			const registry = ModelRegistry.create(authStorage, modelsJsonPath);
+			await registry.loadAutoDetectedProviders({ force: true });
+
+			expect(registry.find("lmstudio", "qwen-3.5-9b#gguf-4-bit")?.name).toBe("Qwen 3.5 9B (GGUF, 4-bit)");
+			expect(registry.find("lmstudio", "qwen-3.5-9b#gguf-8-bit")?.name).toBe("Qwen 3.5 9B (GGUF, 8-bit)");
+		});
+
+		test("infers MLX and GGUF quantization labels from identifiers and paths when fields are missing", async () => {
+			globalThis.fetch = vi.fn().mockResolvedValue(
+				new Response(
+					JSON.stringify({
+						data: [
+							{
+								id: "qwen3.5-9b-mlx",
+								identifier: "mlx-community/qwen3.5-9b-8bit",
+							},
+							{
+								id: "qwen3.5-9b",
+								identifier: "qwen3.5-9b-gguf-q4",
+								path: "/models/qwen3.5-9b-q4_k_m.gguf",
+							},
+							{
+								id: "qwen3.5-9b",
+								identifier: "qwen3.5-9b-gguf-q8",
+								path: "/models/qwen3.5-9b-q8_0.gguf",
+							},
+						],
+					}),
+					{ status: 200, headers: { "content-type": "application/json" } },
+				),
+			);
+
+			const registry = ModelRegistry.create(authStorage, modelsJsonPath);
+			await registry.loadAutoDetectedProviders({ force: true });
+
+			expect(registry.find("lmstudio", "qwen3.5-9b-mlx")?.name).toBe("qwen3.5-9b-mlx (8-bit)");
+			expect(registry.find("lmstudio", "qwen3.5-9b-gguf-q4")?.name).toBe("qwen3.5-9b (GGUF, 4-bit)");
+			expect(registry.find("lmstudio", "qwen3.5-9b-gguf-q8")?.name).toBe("qwen3.5-9b (GGUF, 8-bit)");
+		});
+
+		test("deduplicates repeated LM Studio api/v1 variant records", async () => {
+			globalThis.fetch = vi.fn().mockResolvedValue(
+				new Response(
+					JSON.stringify({
+						models: [
+							{
+								key: "qwen-3.5-9b",
+								display_name: "Qwen 3.5 9B",
+								format: "gguf",
+								variants: ["qwen-3.5-9b-gguf-q4", "qwen-3.5-9b-gguf-q8"],
+							},
+							{
+								key: "qwen-3.5-9b",
+								display_name: "Qwen 3.5 9B",
+								format: "gguf",
+								variants: ["qwen-3.5-9b-gguf-q4", "qwen-3.5-9b-gguf-q8"],
+							},
+						],
+					}),
+					{ status: 200, headers: { "content-type": "application/json" } },
+				),
+			);
+
+			const registry = ModelRegistry.create(authStorage, modelsJsonPath);
+			await registry.loadAutoDetectedProviders({ force: true });
+
+			const availableLmStudioModels = registry.getAvailable().filter((model) => model.provider === "lmstudio");
+			expect(availableLmStudioModels.map((model) => model.id)).toEqual([
+				"qwen-3.5-9b-gguf-q4",
+				"qwen-3.5-9b-gguf-q8",
+			]);
+			expect(availableLmStudioModels.map((model) => model.name)).toEqual([
+				"Qwen 3.5 9B (GGUF, 4-bit)",
+				"Qwen 3.5 9B (GGUF, 8-bit)",
+			]);
+		});
+
+		test("deduplicates semantic duplicates that use different LM Studio request ids", async () => {
+			globalThis.fetch = vi.fn().mockResolvedValue(
+				new Response(
+					JSON.stringify({
+						data: [
+							{
+								id: "qwen35-9b-q80",
+								name: "Qwen3.5 9B",
+								compatibility_type: "gguf",
+								quantization: "8-bit",
+							},
+							{
+								id: "qwen35-9b-q4km",
+								name: "Qwen3.5 9B",
+								compatibility_type: "gguf",
+								quantization: "4-bit",
+							},
+							{
+								id: "qwen/qwen3.5-9b@q8_0",
+								name: "Qwen3.5 9B",
+								compatibility_type: "gguf",
+								quantization: "8-bit",
+							},
+							{
+								id: "qwen/qwen3.5-9b@q4_k_m",
+								name: "Qwen3.5 9B",
+								compatibility_type: "gguf",
+								quantization: "4-bit",
+							},
+						],
+					}),
+					{ status: 200, headers: { "content-type": "application/json" } },
+				),
+			);
+
+			const registry = ModelRegistry.create(authStorage, modelsJsonPath);
+			await registry.loadAutoDetectedProviders({ force: true });
+
+			const availableLmStudioModels = registry.getAvailable().filter((model) => model.provider === "lmstudio");
+			expect(availableLmStudioModels.map((model) => model.id)).toEqual(["qwen35-9b-q4km", "qwen35-9b-q80"]);
+			expect(availableLmStudioModels.map((model) => model.name)).toEqual([
+				"Qwen3.5 9B (GGUF, 4-bit)",
+				"Qwen3.5 9B (GGUF, 8-bit)",
+			]);
+		});
+
+		test("deduplicates qwen gguf variants from the real LM Studio api/v1 payload shape", async () => {
+			globalThis.fetch = vi.fn().mockResolvedValue(
+				new Response(
+					JSON.stringify({
+						models: [
+							{
+								type: "llm",
+								publisher: "bench",
+								key: "qwen35-9b-q80",
+								display_name: "Qwen3.5 9B",
+								architecture: "qwen35",
+								quantization: { name: "Q8_0", bits_per_weight: 8 },
+								max_context_length: 262144,
+								format: "gguf",
+								capabilities: { vision: false, trained_for_tool_use: true },
+							},
+							{
+								type: "llm",
+								publisher: "bench",
+								key: "qwen35-9b-q4km",
+								display_name: "Qwen3.5 9B",
+								architecture: "qwen35",
+								quantization: { name: "Q4_K_M", bits_per_weight: 4 },
+								max_context_length: 262144,
+								format: "gguf",
+								capabilities: { vision: false, trained_for_tool_use: true },
+							},
+							{
+								type: "llm",
+								publisher: "qwen",
+								key: "qwen/qwen3.5-9b",
+								display_name: "Qwen3.5 9B",
+								architecture: "qwen35",
+								quantization: { name: "Q8_0", bits_per_weight: 8 },
+								max_context_length: 262144,
+								format: "gguf",
+								capabilities: { vision: true, trained_for_tool_use: true },
+								variants: ["qwen/qwen3.5-9b@q4_k_m", "qwen/qwen3.5-9b@q8_0"],
+								selected_variant: "qwen/qwen3.5-9b@q8_0",
+							},
+						],
+					}),
+					{ status: 200, headers: { "content-type": "application/json" } },
+				),
+			);
+
+			const registry = ModelRegistry.create(authStorage, modelsJsonPath);
+			await registry.loadAutoDetectedProviders({ force: true });
+
+			const availableLmStudioModels = registry.getAvailable().filter((model) => model.provider === "lmstudio");
+			expect(availableLmStudioModels.map((model) => model.id)).toEqual(["qwen35-9b-q4km", "qwen35-9b-q80"]);
+			expect(availableLmStudioModels.map((model) => model.name)).toEqual([
+				"Qwen3.5 9B (GGUF, 4-bit)",
+				"Qwen3.5 9B (GGUF, 8-bit)",
+			]);
+		});
+
+		test("keeps explicit lmstudio provider config instead of auto-detected models", async () => {
+			writeRawModelsJson({
+				lmstudio: {
+					baseUrl: "http://custom-lmstudio.test/v1",
+					apiKey: "LMSTUDIO_TOKEN",
+					api: "openai-completions",
+					models: [
+						{
+							id: "manual-model",
+							reasoning: false,
+							input: ["text"],
+							cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0 },
+							contextWindow: 4096,
+							maxTokens: 1024,
+						},
+					],
+				},
+			});
+			globalThis.fetch = vi.fn().mockResolvedValue(
+				new Response(
+					JSON.stringify({
+						data: [{ id: "auto-detected-model" }],
+					}),
+					{ status: 200, headers: { "content-type": "application/json" } },
+				),
+			);
+
+			const registry = ModelRegistry.create(authStorage, modelsJsonPath);
+			await registry.loadAutoDetectedProviders({ force: true });
+
+			const manual = registry.find("lmstudio", "manual-model");
+			expect(manual?.baseUrl).toBe("http://custom-lmstudio.test/v1");
+			expect(registry.find("lmstudio", "auto-detected-model")).toBeUndefined();
+		});
+
+		test("applies override-only lmstudio provider config to auto-detected models", async () => {
+			writeRawModelsJson({
+				lmstudio: {
+					baseUrl: "http://custom-lmstudio.test/v1",
+					compat: {
+						supportsDeveloperRole: true,
+						supportsReasoningEffort: true,
+					},
+				},
+			});
+			globalThis.fetch = vi.fn().mockResolvedValue(
+				new Response(
+					JSON.stringify({
+						data: [{ id: "gpt-oss-20b" }],
+					}),
+					{ status: 200, headers: { "content-type": "application/json" } },
+				),
+			);
+
+			const registry = ModelRegistry.create(authStorage, modelsJsonPath);
+			await registry.loadAutoDetectedProviders({ force: true });
+
+			const detected = registry.find("lmstudio", "gpt-oss-20b");
+			expect(detected?.baseUrl).toBe("http://custom-lmstudio.test/v1");
+			const compat = detected?.compat as OpenAICompletionsCompat | undefined;
+			expect(compat?.supportsDeveloperRole).toBe(true);
+			expect(compat?.supportsReasoningEffort).toBe(true);
+		});
+
+		test("applies lmstudio modelOverrides to auto-detected models", async () => {
+			writeRawModelsJson({
+				lmstudio: {
+					modelOverrides: {
+						"gpt-oss-20b": {
+							name: "GPT OSS 20B (Custom Label)",
+							maxTokens: 4096,
+						},
+					},
+				},
+			});
+			globalThis.fetch = vi.fn().mockResolvedValue(
+				new Response(
+					JSON.stringify({
+						data: [{ id: "gpt-oss-20b", max_tokens: 8192 }],
+					}),
+					{ status: 200, headers: { "content-type": "application/json" } },
+				),
+			);
+
+			const registry = ModelRegistry.create(authStorage, modelsJsonPath);
+			await registry.loadAutoDetectedProviders({ force: true });
+
+			const detected = registry.find("lmstudio", "gpt-oss-20b");
+			expect(detected?.name).toBe("GPT OSS 20B (Custom Label)");
+			expect(detected?.maxTokens).toBe(4096);
+		});
+
+		test("refresh preserves previously auto-detected lmstudio models", async () => {
+			globalThis.fetch = vi.fn().mockResolvedValue(
+				new Response(
+					JSON.stringify({
+						data: [{ id: "gpt-oss-20b" }],
+					}),
+					{ status: 200, headers: { "content-type": "application/json" } },
+				),
+			);
+
+			const registry = ModelRegistry.create(authStorage, modelsJsonPath);
+			await registry.loadAutoDetectedProviders({ force: true });
+			expect(registry.find("lmstudio", "gpt-oss-20b")).toBeDefined();
+
+			registry.refresh();
+
+			const refreshed = registry.find("lmstudio", "gpt-oss-20b");
+			expect(refreshed).toBeDefined();
+			expect(registry.hasConfiguredAuth(refreshed!)).toBe(true);
+		});
+	});
 
 	describe("baseUrl override (no custom models)", () => {
 		test("overriding baseUrl keeps all built-in models", () => {

@@ -9,7 +9,9 @@ import {
 	Text,
 	type TUI,
 } from "@mariozechner/pi-tui";
+import { LM_STUDIO_PROVIDER } from "../../../core/lmstudio-discovery.js";
 import type { ModelRegistry } from "../../../core/model-registry.js";
+import { patternReferencesProvider } from "../../../core/model-resolver.js";
 import type { SettingsManager } from "../../../core/settings-manager.js";
 import { theme } from "../theme/theme.js";
 import { DynamicBorder } from "./dynamic-border.js";
@@ -60,6 +62,8 @@ export class ModelSelectorComponent extends Container implements Focusable {
 	private scope: ModelScope = "all";
 	private scopeText?: Text;
 	private scopeHintText?: Text;
+	private lmStudioModelsLoaded = false;
+	private lmStudioLoadPromise?: Promise<void>;
 
 	constructor(
 		tui: TUI,
@@ -122,48 +126,51 @@ export class ModelSelectorComponent extends Container implements Focusable {
 		// Add bottom border
 		this.addChild(new DynamicBorder());
 
-		// Load models and do initial render
-		this.loadModels().then(() => {
+		// Seed the UI from the current registry state immediately so the picker isn't empty
+		// while optional LM Studio auto-discovery is still pending.
+		this.applyLoadedModels(
+			this.modelRegistry.getAvailable().map((model: Model<any>) => ({
+				provider: model.provider,
+				id: model.id,
+				model,
+			})),
+		);
+		if (initialSearchInput) {
+			this.filterModels(initialSearchInput, false);
+		} else {
+			this.updateList();
+		}
+
+		// Refresh models and only auto-load LM Studio when the current session state or
+		// search input indicates the user is actually working with LM Studio.
+		this.loadModels({
+			force: !!initialSearchInput,
+			includeAutoDetectedProviders: this.shouldLoadLmStudioModels(initialSearchInput),
+		}).then(() => {
 			if (initialSearchInput) {
 				this.filterModels(initialSearchInput);
 			} else {
 				this.updateList();
 			}
-			// Request re-render after models are loaded
 			this.tui.requestRender();
 		});
 	}
 
-	private async loadModels(): Promise<void> {
-		let models: ModelItem[];
+	private shouldLoadLmStudioModels(searchPattern?: string): boolean {
+		return (
+			this.currentModel?.provider === LM_STUDIO_PROVIDER ||
+			this.settingsManager.getDefaultProvider() === LM_STUDIO_PROVIDER ||
+			this.settingsManager
+				.getEnabledModels()
+				?.some((pattern) => patternReferencesProvider(pattern, LM_STUDIO_PROVIDER)) === true ||
+			this.scopedModels.some((scoped) => scoped.model.provider === LM_STUDIO_PROVIDER) ||
+			patternReferencesProvider(searchPattern, LM_STUDIO_PROVIDER)
+		);
+	}
 
-		// Refresh to pick up any changes to models.json
-		this.modelRegistry.refresh();
-
-		// Check for models.json errors
-		const loadError = this.modelRegistry.getError();
-		if (loadError) {
-			this.errorMessage = loadError;
-		}
-
-		// Load available models (built-in models still work even if models.json failed)
-		try {
-			const availableModels = await this.modelRegistry.getAvailable();
-			models = availableModels.map((model: Model<any>) => ({
-				provider: model.provider,
-				id: model.id,
-				model,
-			}));
-		} catch (error) {
-			this.allModels = [];
-			this.scopedModelItems = [];
-			this.activeModels = [];
-			this.filteredModels = [];
-			this.errorMessage = error instanceof Error ? error.message : String(error);
-			return;
-		}
-
+	private applyLoadedModels(models: ModelItem[]): void {
 		this.allModels = this.sortModels(models);
+		this.lmStudioModelsLoaded = this.allModels.some((item) => item.provider === LM_STUDIO_PROVIDER);
 		this.scopedModels = this.scopedModels.map((scoped) => {
 			const refreshed = this.modelRegistry.find(scoped.model.provider, scoped.model.id);
 			return refreshed ? { ...scoped, model: refreshed } : scoped;
@@ -180,6 +187,54 @@ export class ModelSelectorComponent extends Container implements Focusable {
 			currentIndex >= 0 ? currentIndex : Math.min(this.selectedIndex, Math.max(0, this.filteredModels.length - 1));
 	}
 
+	private async loadModels(options?: { force?: boolean; includeAutoDetectedProviders?: boolean }): Promise<void> {
+		let models: ModelItem[];
+
+		this.modelRegistry.refresh();
+		if (options?.includeAutoDetectedProviders) {
+			await this.modelRegistry.loadAutoDetectedProviders({ force: options.force });
+		}
+
+		const loadError = this.modelRegistry.getError();
+		this.errorMessage = loadError;
+
+		try {
+			const availableModels = this.modelRegistry.getAvailable();
+			models = availableModels.map((model: Model<any>) => ({
+				provider: model.provider,
+				id: model.id,
+				model,
+			}));
+		} catch (error) {
+			this.allModels = [];
+			this.scopedModelItems = [];
+			this.activeModels = [];
+			this.filteredModels = [];
+			this.errorMessage = error instanceof Error ? error.message : String(error);
+			return;
+		}
+
+		this.applyLoadedModels(models);
+	}
+
+	private maybeLoadLmStudioModels(query: string): void {
+		if (this.lmStudioModelsLoaded || !patternReferencesProvider(query, LM_STUDIO_PROVIDER)) {
+			return;
+		}
+		if (this.lmStudioLoadPromise) {
+			return;
+		}
+
+		this.lmStudioLoadPromise = this.loadModels({ force: true, includeAutoDetectedProviders: true })
+			.then(() => {
+				this.filterModels(this.searchInput.getValue(), false);
+				this.tui.requestRender();
+			})
+			.finally(() => {
+				this.lmStudioLoadPromise = undefined;
+			});
+	}
+
 	private sortModels(models: ModelItem[]): ModelItem[] {
 		const sorted = [...models];
 		// Sort: current model first, then by provider
@@ -191,6 +246,19 @@ export class ModelSelectorComponent extends Container implements Focusable {
 			return a.provider.localeCompare(b.provider);
 		});
 		return sorted;
+	}
+
+	private shouldShowLmStudioLabel(model: Model<any>): boolean {
+		return model.provider === LM_STUDIO_PROVIDER && model.name !== model.id;
+	}
+
+	private getSearchText(item: ModelItem): string {
+		const base = `${item.id} ${item.provider} ${item.provider}/${item.id} ${item.provider} ${item.id}`;
+		return this.shouldShowLmStudioLabel(item.model) ? `${base} ${item.model.name}` : base;
+	}
+
+	private getVariantLabel(model: Model<any>): string {
+		return this.shouldShowLmStudioLabel(model) ? theme.fg("muted", ` — ${model.name}`) : "";
 	}
 
 	private getScopeText(): string {
@@ -215,13 +283,12 @@ export class ModelSelectorComponent extends Container implements Focusable {
 		}
 	}
 
-	private filterModels(query: string): void {
+	private filterModels(query: string, allowLmStudioLoad = true): void {
+		if (allowLmStudioLoad) {
+			this.maybeLoadLmStudioModels(query);
+		}
 		this.filteredModels = query
-			? fuzzyFilter(
-					this.activeModels,
-					query,
-					({ id, provider }) => `${id} ${provider} ${provider}/${id} ${provider} ${id}`,
-				)
+			? fuzzyFilter(this.activeModels, query, (item) => this.getSearchText(item))
 			: this.activeModels;
 		this.selectedIndex = Math.min(this.selectedIndex, Math.max(0, this.filteredModels.length - 1));
 		this.updateList();
@@ -245,18 +312,18 @@ export class ModelSelectorComponent extends Container implements Focusable {
 			const isSelected = i === this.selectedIndex;
 			const isCurrent = modelsAreEqual(this.currentModel, item.model);
 
+			const variantLabel = this.getVariantLabel(item.model);
 			let line = "";
 			if (isSelected) {
 				const prefix = theme.fg("accent", "→ ");
-				const modelText = `${item.id}`;
 				const providerBadge = theme.fg("muted", `[${item.provider}]`);
 				const checkmark = isCurrent ? theme.fg("success", " ✓") : "";
-				line = `${prefix + theme.fg("accent", modelText)} ${providerBadge}${checkmark}`;
+				line = `${prefix + theme.fg("accent", item.id)} ${providerBadge}${variantLabel}${checkmark}`;
 			} else {
 				const modelText = `  ${item.id}`;
 				const providerBadge = theme.fg("muted", `[${item.provider}]`);
 				const checkmark = isCurrent ? theme.fg("success", " ✓") : "";
-				line = `${modelText} ${providerBadge}${checkmark}`;
+				line = `${modelText} ${providerBadge}${variantLabel}${checkmark}`;
 			}
 
 			this.listContainer.addChild(new Text(line, 0, 0));
@@ -281,6 +348,9 @@ export class ModelSelectorComponent extends Container implements Focusable {
 			const selected = this.filteredModels[this.selectedIndex];
 			this.listContainer.addChild(new Spacer(1));
 			this.listContainer.addChild(new Text(theme.fg("muted", `  Model Name: ${selected.model.name}`), 0, 0));
+			if (this.shouldShowLmStudioLabel(selected.model)) {
+				this.listContainer.addChild(new Text(theme.fg("muted", `  Model ID: ${selected.model.id}`), 0, 0));
+			}
 		}
 	}
 

@@ -34,6 +34,8 @@ import { buildCopilotDynamicHeaders, hasCopilotVisionInput } from "./github-copi
 import { buildBaseOptions, clampReasoning } from "./simple-options.js";
 import { transformMessages } from "./transform-messages.js";
 
+const INTERNAL_REQUEST_MODEL_ID_HEADER = "x-pi-lmstudio-request-model-id";
+
 /**
  * Check if conversation messages contain tool calls or tool results.
  * This is needed because Anthropic (via proxy) requires the tools param
@@ -334,6 +336,21 @@ export const streamSimpleOpenAICompletions: StreamFunction<"openai-completions",
 	} satisfies OpenAICompletionsOptions);
 };
 
+function getRequestModelId(model: Model<"openai-completions">): string {
+	const internalRequestModelId = model.headers?.[INTERNAL_REQUEST_MODEL_ID_HEADER];
+	return internalRequestModelId || model.id;
+}
+
+function stripInternalHeaders(headers?: Record<string, string>): Record<string, string> | undefined {
+	if (!headers) {
+		return headers;
+	}
+
+	const nextHeaders = { ...headers };
+	delete nextHeaders[INTERNAL_REQUEST_MODEL_ID_HEADER];
+	return Object.keys(nextHeaders).length > 0 ? nextHeaders : undefined;
+}
+
 function createClient(
 	model: Model<"openai-completions">,
 	context: Context,
@@ -349,7 +366,7 @@ function createClient(
 		apiKey = process.env.OPENAI_API_KEY;
 	}
 
-	const headers = { ...model.headers };
+	const headers = { ...stripInternalHeaders(model.headers) };
 	if (model.provider === "github-copilot") {
 		const hasImages = hasCopilotVisionInput(context.messages);
 		const copilotHeaders = buildCopilotDynamicHeaders({
@@ -361,7 +378,7 @@ function createClient(
 
 	// Merge options headers last so they can override defaults
 	if (optionsHeaders) {
-		Object.assign(headers, optionsHeaders);
+		Object.assign(headers, stripInternalHeaders(optionsHeaders));
 	}
 
 	return new OpenAI({
@@ -378,7 +395,7 @@ function buildParams(model: Model<"openai-completions">, context: Context, optio
 	maybeAddOpenRouterAnthropicCacheControl(model, messages);
 
 	const params: OpenAI.Chat.Completions.ChatCompletionCreateParamsStreaming = {
-		model: model.id,
+		model: getRequestModelId(model),
 		messages,
 		stream: true,
 	};

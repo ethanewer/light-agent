@@ -57,8 +57,14 @@ import type {
 } from "../../core/extensions/index.js";
 import { FooterDataProvider, type ReadonlyFooterDataProvider } from "../../core/footer-data-provider.js";
 import { type AppKeybinding, KeybindingsManager } from "../../core/keybindings.js";
+import { LM_STUDIO_PROVIDER } from "../../core/lmstudio-discovery.js";
 import { createCompactionSummaryMessage } from "../../core/messages.js";
-import { defaultModelPerProvider, findExactModelReferenceMatch, resolveModelScope } from "../../core/model-resolver.js";
+import {
+	defaultModelPerProvider,
+	findExactModelReferenceMatch,
+	patternReferencesProvider,
+	resolveModelScope,
+} from "../../core/model-resolver.js";
 import { DefaultPackageManager } from "../../core/package-manager.js";
 import type { ResourceDiagnostic } from "../../core/resource-loader.js";
 import { formatMissingSessionCwdPrompt, MissingSessionCwdError } from "../../core/session-cwd.js";
@@ -4140,18 +4146,33 @@ export class InteractiveMode {
 	}
 
 	private async findExactModelMatch(searchTerm: string): Promise<Model<any> | undefined> {
-		const models = await this.getModelCandidates();
+		const models = await this.getModelCandidates(searchTerm);
 		return findExactModelReferenceMatch(searchTerm, models);
 	}
 
-	private async getModelCandidates(): Promise<Model<any>[]> {
+	private shouldLoadLmStudioModels(searchPattern?: string): boolean {
+		return (
+			this.session.model?.provider === LM_STUDIO_PROVIDER ||
+			this.settingsManager.getDefaultProvider() === LM_STUDIO_PROVIDER ||
+			this.session.scopedModels.some((scoped) => scoped.model.provider === LM_STUDIO_PROVIDER) ||
+			this.settingsManager
+				.getEnabledModels()
+				?.some((pattern) => patternReferencesProvider(pattern, LM_STUDIO_PROVIDER)) === true ||
+			patternReferencesProvider(searchPattern, LM_STUDIO_PROVIDER)
+		);
+	}
+
+	private async getModelCandidates(searchPattern?: string): Promise<Model<any>[]> {
 		if (this.session.scopedModels.length > 0) {
 			return this.session.scopedModels.map((scoped) => scoped.model);
 		}
 
-		this.session.modelRegistry.refresh();
 		try {
-			return await this.session.modelRegistry.getAvailable();
+			this.session.modelRegistry.refresh();
+			if (this.shouldLoadLmStudioModels(searchPattern)) {
+				await this.session.modelRegistry.loadAutoDetectedProviders();
+			}
+			return this.session.modelRegistry.getAvailable();
 		} catch {
 			return [];
 		}
@@ -4228,6 +4249,9 @@ export class InteractiveMode {
 	private async showModelsSelector(): Promise<void> {
 		// Get all available models
 		this.session.modelRegistry.refresh();
+		if (this.shouldLoadLmStudioModels()) {
+			await this.session.modelRegistry.loadAutoDetectedProviders({ force: true });
+		}
 		const allModels = this.session.modelRegistry.getAvailable();
 
 		if (allModels.length === 0) {

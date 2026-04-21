@@ -1,6 +1,6 @@
 import { existsSync, readFileSync } from "fs";
 import { homedir } from "os";
-import { dirname, join, resolve } from "path";
+import { basename, dirname, join, resolve } from "path";
 import { fileURLToPath } from "url";
 
 // =============================================================================
@@ -74,9 +74,27 @@ export function getUpdateInstruction(packageName: string): string {
 /**
  * Get the base directory for resolving package assets (themes, package.json, README.md, CHANGELOG.md).
  * - For Bun binary: returns the directory containing the executable
- * - For Node.js (dist/): returns __dirname (the dist/ directory)
- * - For tsx (src/): returns parent directory (the package root)
+ * - For Node.js (dist/ and src/): returns the package root
  */
+export function resolvePackageDirFrom(startDir: string): string {
+	let dir = startDir;
+	while (dir !== dirname(dir)) {
+		if (existsSync(join(dir, "package.json"))) {
+			const parent = dirname(dir);
+			if ((basename(dir) === "dist" || basename(dir) === "src") && existsSync(join(parent, "package.json"))) {
+				return parent;
+			}
+			return dir;
+		}
+		dir = dirname(dir);
+	}
+	return startDir;
+}
+
+export function resolveNodeRuntimeDirName(currentDir: string): "src" | "dist" {
+	return basename(currentDir) === "dist" ? "dist" : "src";
+}
+
 export function getPackageDir(): string {
 	// Allow override via environment variable (useful for Nix/Guix where store paths tokenize poorly)
 	const envDir = process.env.PI_PACKAGE_DIR;
@@ -90,16 +108,10 @@ export function getPackageDir(): string {
 		// Bun binary: process.execPath points to the compiled executable
 		return dirname(process.execPath);
 	}
-	// Node.js: walk up from __dirname until we find package.json
-	let dir = __dirname;
-	while (dir !== dirname(dir)) {
-		if (existsSync(join(dir, "package.json"))) {
-			return dir;
-		}
-		dir = dirname(dir);
-	}
-	// Fallback (shouldn't happen)
-	return __dirname;
+
+	// Node.js: walk up from __dirname until we find package.json.
+	// Ignore nested dist/src package.json files and prefer the actual package root.
+	return resolvePackageDirFrom(__dirname);
 }
 
 /**
@@ -112,10 +124,8 @@ export function getThemesDir(): string {
 	if (isBunBinary) {
 		return join(getPackageDir(), "theme");
 	}
-	// Theme is in modes/interactive/theme/ relative to src/ or dist/
 	const packageDir = getPackageDir();
-	const srcOrDist = existsSync(join(packageDir, "src")) ? "src" : "dist";
-	return join(packageDir, srcOrDist, "modes", "interactive", "theme");
+	return join(packageDir, resolveNodeRuntimeDirName(__dirname), "modes", "interactive", "theme");
 }
 
 /**
@@ -129,8 +139,7 @@ export function getExportTemplateDir(): string {
 		return join(getPackageDir(), "export-html");
 	}
 	const packageDir = getPackageDir();
-	const srcOrDist = existsSync(join(packageDir, "src")) ? "src" : "dist";
-	return join(packageDir, srcOrDist, "core", "export-html");
+	return join(packageDir, resolveNodeRuntimeDirName(__dirname), "core", "export-html");
 }
 
 /** Get path to package.json */
@@ -169,8 +178,7 @@ export function getInteractiveAssetsDir(): string {
 		return join(getPackageDir(), "assets");
 	}
 	const packageDir = getPackageDir();
-	const srcOrDist = existsSync(join(packageDir, "src")) ? "src" : "dist";
-	return join(packageDir, srcOrDist, "modes", "interactive", "assets");
+	return join(packageDir, resolveNodeRuntimeDirName(__dirname), "modes", "interactive", "assets");
 }
 
 /** Get path to a bundled interactive asset */
