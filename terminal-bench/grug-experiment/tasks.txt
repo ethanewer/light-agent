@@ -1,0 +1,12 @@
+chess-best-move
+circuit-fibsqrt
+compile-compcert
+extract-elf
+git-leak-recovery
+multi-source-data-merger
+path-tracing
+rstan-to-pystan
+sanitize-git-repo
+sparql-university
+sqlite-db-truncate
+torch-tensor-parallelism

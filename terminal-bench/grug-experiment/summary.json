@@ -1,0 +1,726 @@
+{
+  "config": {
+    "model": "openai/gpt-5.4",
+    "tools": [
+      "read",
+      "bash",
+      "edit",
+      "write"
+    ],
+    "attempts_per_task": 5,
+    "concurrency": 24,
+    "tasks": [
+      "chess-best-move",
+      "circuit-fibsqrt",
+      "compile-compcert",
+      "extract-elf",
+      "git-leak-recovery",
+      "multi-source-data-merger",
+      "path-tracing",
+      "rstan-to-pystan",
+      "sanitize-git-repo",
+      "sparql-university",
+      "sqlite-db-truncate",
+      "torch-tensor-parallelism"
+    ],
+    "bench": "terminal-bench@2.0 \u2014 tb2-efficient-subset n=12"
+  },
+  "experiments": {
+    "default-high": {
+      "description": "GPT-5.4 high, default pi prompt",
+      "model": "gpt-5.4",
+      "provider": "openai",
+      "mean_reward": 0.85,
+      "n_trials": 60,
+      "n_scored": 60,
+      "n_tasks_solved_any": 11,
+      "harbor_reported_mean": 0.85,
+      "harbor_pass_at_k": {
+        "2": 0.9083333333333333,
+        "4": 0.9166666666666666,
+        "5": 0.9166666666666666
+      },
+      "tokens": {
+        "input": 1192367,
+        "output": 669541,
+        "cache_read": 25844096,
+        "cache_write": 0,
+        "total": 27706004
+      },
+      "cost_total": 19.4851,
+      "per_task": {
+        "chess-best-move": {
+          "n_scored": 5,
+          "mean_reward": 1.0,
+          "pass_at_5": 1.0,
+          "rewards": [
+            1.0,
+            1.0,
+            1.0,
+            1.0,
+            1.0
+          ],
+          "input_tokens": 37620,
+          "output_tokens": 32338,
+          "cache_read_tokens": 122496,
+          "total_tokens": 192454,
+          "cost_total": 0.6097
+        },
+        "circuit-fibsqrt": {
+          "n_scored": 5,
+          "mean_reward": 1.0,
+          "pass_at_5": 1.0,
+          "rewards": [
+            1.0,
+            1.0,
+            1.0,
+            1.0,
+            1.0
+          ],
+          "input_tokens": 76797,
+          "output_tokens": 113728,
+          "cache_read_tokens": 949632,
+          "total_tokens": 1140157,
+          "cost_total": 2.1353
+        },
+        "compile-compcert": {
+          "n_scored": 5,
+          "mean_reward": 1.0,
+          "pass_at_5": 1.0,
+          "rewards": [
+            1.0,
+            1.0,
+            1.0,
+            1.0,
+            1.0
+          ],
+          "input_tokens": 334136,
+          "output_tokens": 58414,
+          "cache_read_tokens": 10755456,
+          "total_tokens": 11148006,
+          "cost_total": 4.4004
+        },
+        "extract-elf": {
+          "n_scored": 5,
+          "mean_reward": 1.0,
+          "pass_at_5": 1.0,
+          "rewards": [
+            1.0,
+            1.0,
+            1.0,
+            1.0,
+            1.0
+          ],
+          "input_tokens": 71587,
+          "output_tokens": 78528,
+          "cache_read_tokens": 1280256,
+          "total_tokens": 1430371,
+          "cost_total": 1.677
+        },
+        "git-leak-recovery": {
+          "n_scored": 5,
+          "mean_reward": 0.8,
+          "pass_at_5": 1.0,
+          "rewards": [
+            0.0,
+            1.0,
+            1.0,
+            1.0,
+            1.0
+          ],
+          "input_tokens": 23323,
+          "output_tokens": 19335,
+          "cache_read_tokens": 182272,
+          "total_tokens": 224930,
+          "cost_total": 0.3939
+        },
+        "multi-source-data-merger": {
+          "n_scored": 5,
+          "mean_reward": 1.0,
+          "pass_at_5": 1.0,
+          "rewards": [
+            1.0,
+            1.0,
+            1.0,
+            1.0,
+            1.0
+          ],
+          "input_tokens": 18158,
+          "output_tokens": 20497,
+          "cache_read_tokens": 89856,
+          "total_tokens": 128511,
+          "cost_total": 0.3753
+        },
+        "path-tracing": {
+          "n_scored": 5,
+          "mean_reward": 1.0,
+          "pass_at_5": 1.0,
+          "rewards": [
+            1.0,
+            1.0,
+            1.0,
+            1.0,
+            1.0
+          ],
+          "input_tokens": 102676,
+          "output_tokens": 169050,
+          "cache_read_tokens": 5585152,
+          "total_tokens": 5856878,
+          "cost_total": 4.1887
+        },
+        "rstan-to-pystan": {
+          "n_scored": 5,
+          "mean_reward": 0.6,
+          "pass_at_5": 1.0,
+          "rewards": [
+            0.0,
+            1.0,
+            1.0,
+            0.0,
+            1.0
+          ],
+          "input_tokens": 131104,
+          "output_tokens": 32926,
+          "cache_read_tokens": 1902592,
+          "total_tokens": 2066622,
+          "cost_total": 1.2973
+        },
+        "sanitize-git-repo": {
+          "n_scored": 5,
+          "mean_reward": 0.8,
+          "pass_at_5": 1.0,
+          "rewards": [
+            0.0,
+            1.0,
+            1.0,
+            1.0,
+            1.0
+          ],
+          "input_tokens": 303846,
+          "output_tokens": 52634,
+          "cache_read_tokens": 4240384,
+          "total_tokens": 4596864,
+          "cost_total": 2.6092
+        },
+        "sparql-university": {
+          "n_scored": 5,
+          "mean_reward": 1.0,
+          "pass_at_5": 1.0,
+          "rewards": [
+            1.0,
+            1.0,
+            1.0,
+            1.0,
+            1.0
+          ],
+          "input_tokens": 40621,
+          "output_tokens": 20482,
+          "cache_read_tokens": 298880,
+          "total_tokens": 359983,
+          "cost_total": 0.4835
+        },
+        "sqlite-db-truncate": {
+          "n_scored": 5,
+          "mean_reward": 1.0,
+          "pass_at_5": 1.0,
+          "rewards": [
+            1.0,
+            1.0,
+            1.0,
+            1.0,
+            1.0
+          ],
+          "input_tokens": 24583,
+          "output_tokens": 16045,
+          "cache_read_tokens": 145920,
+          "total_tokens": 186548,
+          "cost_total": 0.3386
+        },
+        "torch-tensor-parallelism": {
+          "n_scored": 5,
+          "mean_reward": 0.0,
+          "pass_at_5": 0.0,
+          "rewards": [
+            0.0,
+            0.0,
+            0.0,
+            0.0,
+            0.0
+          ],
+          "input_tokens": 27916,
+          "output_tokens": 55564,
+          "cache_read_tokens": 291200,
+          "total_tokens": 374680,
+          "cost_total": 0.9761
+        }
+      },
+      "job_dirs": [
+        "jobs/2026-04-21__02-51-39"
+      ]
+    },
+    "grug-high": {
+      "description": "GPT-5.4 high, Grug-infused prompt",
+      "model": "gpt-5.4",
+      "provider": "openai",
+      "mean_reward": 0.6666666666666666,
+      "n_trials": 60,
+      "n_scored": 60,
+      "n_tasks_solved_any": 11,
+      "harbor_reported_mean": 0.6666666666666666,
+      "harbor_pass_at_k": {
+        "2": 0.7999999999999999,
+        "4": 0.8833333333333333,
+        "5": 0.9166666666666666
+      },
+      "tokens": {
+        "input": 1449264,
+        "output": 605624,
+        "cache_read": 24027392,
+        "cache_write": 0,
+        "total": 26082280
+      },
+      "cost_total": 18.7144,
+      "per_task": {
+        "chess-best-move": {
+          "n_scored": 5,
+          "mean_reward": 0.8,
+          "pass_at_5": 1.0,
+          "rewards": [
+            0.0,
+            1.0,
+            1.0,
+            1.0,
+            1.0
+          ],
+          "input_tokens": 53692,
+          "output_tokens": 31396,
+          "cache_read_tokens": 205312,
+          "total_tokens": 290400,
+          "cost_total": 0.6565
+        },
+        "circuit-fibsqrt": {
+          "n_scored": 5,
+          "mean_reward": 0.8,
+          "pass_at_5": 1.0,
+          "rewards": [
+            1.0,
+            1.0,
+            0.0,
+            1.0,
+            1.0
+          ],
+          "input_tokens": 63528,
+          "output_tokens": 115548,
+          "cache_read_tokens": 1410048,
+          "total_tokens": 1589124,
+          "cost_total": 2.2446
+        },
+        "compile-compcert": {
+          "n_scored": 5,
+          "mean_reward": 0.8,
+          "pass_at_5": 1.0,
+          "rewards": [
+            1.0,
+            1.0,
+            0.0,
+            1.0,
+            1.0
+          ],
+          "input_tokens": 414488,
+          "output_tokens": 48260,
+          "cache_read_tokens": 6624768,
+          "total_tokens": 7087516,
+          "cost_total": 3.4163
+        },
+        "extract-elf": {
+          "n_scored": 5,
+          "mean_reward": 0.2,
+          "pass_at_5": 1.0,
+          "rewards": [
+            0.0,
+            1.0,
+            0.0,
+            0.0,
+            0.0
+          ],
+          "input_tokens": 88827,
+          "output_tokens": 71877,
+          "cache_read_tokens": 1425920,
+          "total_tokens": 1586624,
+          "cost_total": 1.6567
+        },
+        "git-leak-recovery": {
+          "n_scored": 5,
+          "mean_reward": 1.0,
+          "pass_at_5": 1.0,
+          "rewards": [
+            1.0,
+            1.0,
+            1.0,
+            1.0,
+            1.0
+          ],
+          "input_tokens": 36842,
+          "output_tokens": 23522,
+          "cache_read_tokens": 362624,
+          "total_tokens": 422988,
+          "cost_total": 0.5356
+        },
+        "multi-source-data-merger": {
+          "n_scored": 5,
+          "mean_reward": 1.0,
+          "pass_at_5": 1.0,
+          "rewards": [
+            1.0,
+            1.0,
+            1.0,
+            1.0,
+            1.0
+          ],
+          "input_tokens": 27401,
+          "output_tokens": 23931,
+          "cache_read_tokens": 176384,
+          "total_tokens": 227716,
+          "cost_total": 0.4716
+        },
+        "path-tracing": {
+          "n_scored": 5,
+          "mean_reward": 0.6,
+          "pass_at_5": 1.0,
+          "rewards": [
+            1.0,
+            1.0,
+            1.0,
+            0.0,
+            0.0
+          ],
+          "input_tokens": 203488,
+          "output_tokens": 127762,
+          "cache_read_tokens": 5612416,
+          "total_tokens": 5943666,
+          "cost_total": 3.8283
+        },
+        "rstan-to-pystan": {
+          "n_scored": 5,
+          "mean_reward": 0.2,
+          "pass_at_5": 1.0,
+          "rewards": [
+            0.0,
+            0.0,
+            0.0,
+            0.0,
+            1.0
+          ],
+          "input_tokens": 50946,
+          "output_tokens": 12381,
+          "cache_read_tokens": 1342848,
+          "total_tokens": 1406175,
+          "cost_total": 0.6488
+        },
+        "sanitize-git-repo": {
+          "n_scored": 5,
+          "mean_reward": 0.6,
+          "pass_at_5": 1.0,
+          "rewards": [
+            1.0,
+            1.0,
+            0.0,
+            0.0,
+            1.0
+          ],
+          "input_tokens": 408751,
+          "output_tokens": 55268,
+          "cache_read_tokens": 5917184,
+          "total_tokens": 6381203,
+          "cost_total": 3.3302
+        },
+        "sparql-university": {
+          "n_scored": 5,
+          "mean_reward": 1.0,
+          "pass_at_5": 1.0,
+          "rewards": [
+            1.0,
+            1.0,
+            1.0,
+            1.0,
+            1.0
+          ],
+          "input_tokens": 49473,
+          "output_tokens": 35319,
+          "cache_read_tokens": 626560,
+          "total_tokens": 711352,
+          "cost_total": 0.8101
+        },
+        "sqlite-db-truncate": {
+          "n_scored": 5,
+          "mean_reward": 1.0,
+          "pass_at_5": 1.0,
+          "rewards": [
+            1.0,
+            1.0,
+            1.0,
+            1.0,
+            1.0
+          ],
+          "input_tokens": 21031,
+          "output_tokens": 15733,
+          "cache_read_tokens": 161024,
+          "total_tokens": 197788,
+          "cost_total": 0.3288
+        },
+        "torch-tensor-parallelism": {
+          "n_scored": 5,
+          "mean_reward": 0.0,
+          "pass_at_5": 0.0,
+          "rewards": [
+            0.0,
+            0.0,
+            0.0,
+            0.0,
+            0.0
+          ],
+          "input_tokens": 30797,
+          "output_tokens": 44627,
+          "cache_read_tokens": 162304,
+          "total_tokens": 237728,
+          "cost_total": 0.787
+        }
+      },
+      "job_dirs": [
+        "jobs/2026-04-21__04-10-46"
+      ]
+    },
+    "grug-medium": {
+      "description": "GPT-5.4 medium, Grug-infused prompt",
+      "model": "gpt-5.4",
+      "provider": "openai",
+      "mean_reward": 0.7166666666666667,
+      "n_trials": 60,
+      "n_scored": 60,
+      "n_tasks_solved_any": 11,
+      "harbor_reported_mean": 0.7166666666666667,
+      "harbor_pass_at_k": {
+        "2": 0.8333333333333334,
+        "4": 0.9,
+        "5": 0.9166666666666666
+      },
+      "tokens": {
+        "input": 1114832,
+        "output": 394562,
+        "cache_read": 15624192,
+        "cache_write": 0,
+        "total": 17133586
+      },
+      "cost_total": 12.6116,
+      "per_task": {
+        "chess-best-move": {
+          "n_scored": 5,
+          "mean_reward": 0.8,
+          "pass_at_5": 1.0,
+          "rewards": [
+            0.0,
+            1.0,
+            1.0,
+            1.0,
+            1.0
+          ],
+          "input_tokens": 39931,
+          "output_tokens": 22469,
+          "cache_read_tokens": 195968,
+          "total_tokens": 258368,
+          "cost_total": 0.4859
+        },
+        "circuit-fibsqrt": {
+          "n_scored": 5,
+          "mean_reward": 1.0,
+          "pass_at_5": 1.0,
+          "rewards": [
+            1.0,
+            1.0,
+            1.0,
+            1.0,
+            1.0
+          ],
+          "input_tokens": 48979,
+          "output_tokens": 93400,
+          "cache_read_tokens": 868864,
+          "total_tokens": 1011243,
+          "cost_total": 1.7407
+        },
+        "compile-compcert": {
+          "n_scored": 5,
+          "mean_reward": 1.0,
+          "pass_at_5": 1.0,
+          "rewards": [
+            1.0,
+            1.0,
+            1.0,
+            1.0,
+            1.0
+          ],
+          "input_tokens": 410285,
+          "output_tokens": 38420,
+          "cache_read_tokens": 6843904,
+          "total_tokens": 7292609,
+          "cost_total": 3.313
+        },
+        "extract-elf": {
+          "n_scored": 5,
+          "mean_reward": 0.6,
+          "pass_at_5": 1.0,
+          "rewards": [
+            1.0,
+            1.0,
+            0.0,
+            0.0,
+            1.0
+          ],
+          "input_tokens": 64192,
+          "output_tokens": 59783,
+          "cache_read_tokens": 957440,
+          "total_tokens": 1081415,
+          "cost_total": 1.2966
+        },
+        "git-leak-recovery": {
+          "n_scored": 5,
+          "mean_reward": 1.0,
+          "pass_at_5": 1.0,
+          "rewards": [
+            1.0,
+            1.0,
+            1.0,
+            1.0,
+            1.0
+          ],
+          "input_tokens": 21838,
+          "output_tokens": 11028,
+          "cache_read_tokens": 156160,
+          "total_tokens": 189026,
+          "cost_total": 0.2591
+        },
+        "multi-source-data-merger": {
+          "n_scored": 5,
+          "mean_reward": 1.0,
+          "pass_at_5": 1.0,
+          "rewards": [
+            1.0,
+            1.0,
+            1.0,
+            1.0,
+            1.0
+          ],
+          "input_tokens": 28216,
+          "output_tokens": 14485,
+          "cache_read_tokens": 84864,
+          "total_tokens": 127565,
+          "cost_total": 0.309
+        },
+        "path-tracing": {
+          "n_scored": 5,
+          "mean_reward": 0.4,
+          "pass_at_5": 1.0,
+          "rewards": [
+            0.0,
+            0.0,
+            1.0,
+            0.0,
+            1.0
+          ],
+          "input_tokens": 68311,
+          "output_tokens": 46790,
+          "cache_read_tokens": 2715520,
+          "total_tokens": 2830621,
+          "cost_total": 1.5515
+        },
+        "rstan-to-pystan": {
+          "n_scored": 5,
+          "mean_reward": 0.2,
+          "pass_at_5": 1.0,
+          "rewards": [
+            0.0,
+            0.0,
+            0.0,
+            1.0,
+            0.0
+          ],
+          "input_tokens": 0,
+          "output_tokens": 0,
+          "cache_read_tokens": 0,
+          "total_tokens": 0,
+          "cost_total": 0.0
+        },
+        "sanitize-git-repo": {
+          "n_scored": 5,
+          "mean_reward": 0.8,
+          "pass_at_5": 1.0,
+          "rewards": [
+            1.0,
+            1.0,
+            1.0,
+            0.0,
+            1.0
+          ],
+          "input_tokens": 336863,
+          "output_tokens": 37072,
+          "cache_read_tokens": 2777856,
+          "total_tokens": 3151791,
+          "cost_total": 2.0927
+        },
+        "sparql-university": {
+          "n_scored": 5,
+          "mean_reward": 1.0,
+          "pass_at_5": 1.0,
+          "rewards": [
+            1.0,
+            1.0,
+            1.0,
+            1.0,
+            1.0
+          ],
+          "input_tokens": 51922,
+          "output_tokens": 29710,
+          "cache_read_tokens": 695936,
+          "total_tokens": 777568,
+          "cost_total": 0.7494
+        },
+        "sqlite-db-truncate": {
+          "n_scored": 5,
+          "mean_reward": 0.8,
+          "pass_at_5": 1.0,
+          "rewards": [
+            0.0,
+            1.0,
+            1.0,
+            1.0,
+            1.0
+          ],
+          "input_tokens": 24735,
+          "output_tokens": 10106,
+          "cache_read_tokens": 98048,
+          "total_tokens": 132889,
+          "cost_total": 0.2379
+        },
+        "torch-tensor-parallelism": {
+          "n_scored": 5,
+          "mean_reward": 0.0,
+          "pass_at_5": 0.0,
+          "rewards": [
+            0.0,
+            0.0,
+            0.0,
+            0.0,
+            0.0
+          ],
+          "input_tokens": 19560,
+          "output_tokens": 31299,
+          "cache_read_tokens": 229632,
+          "total_tokens": 280491,
+          "cost_total": 0.5758
+        }
+      },
+      "job_dirs": [
+        "jobs/2026-04-21__05-31-46"
+      ]
+    }
+  }
+}

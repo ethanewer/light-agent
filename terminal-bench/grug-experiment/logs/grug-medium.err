@@ -1,0 +1,16 @@
+
+==> Prefetching 12 Docker image(s)...
+    alexgshaw/chess-best-move:20251031 (cached)
+    alexgshaw/circuit-fibsqrt:20251031 (cached)
+    alexgshaw/compile-compcert:20251031 (cached)
+    alexgshaw/extract-elf:20251031 (cached)
+    alexgshaw/git-leak-recovery:20251031 (cached)
+    alexgshaw/multi-source-data-merger:20251031 (cached)
+    alexgshaw/path-tracing:20251031 (cached)
+    alexgshaw/rstan-to-pystan:20251031 (cached)
+    alexgshaw/sanitize-git-repo:20251031 (cached)
+    alexgshaw/sparql-university:20251031 (cached)
+    alexgshaw/sqlite-db-truncate:20251031 (cached)
+    alexgshaw/torch-tensor-parallelism:20251031 (cached)
+==> Prefetch complete (12 cached)
+

@@ -1,0 +1,59 @@
+==> Experiment: grug-medium
+    Model:     openai/gpt-5.4
+    Thinking:  medium
+    Tools:     read,bash,edit,write
+    Prompt:    grug-system-prompt.txt (7723 bytes)
+    Tasks:     12
+    Attempts:  5
+    Tag:       grug-exp-grug-medium-2026-04-21__05-31-45
+
+==> Running pi agent on terminal-bench@2.0
+    Model:       openai/gpt-5.4
+    Thinking:    medium
+    Tools:       read,bash,edit,write
+    Attempts:    5
+    Concurrency: 24
+    Tasks:       chess-best-move circuit-fibsqrt compile-compcert extract-elf git-leak-recovery multi-source-data-merger path-tracing rstan-to-pystan sanitize-git-repo sparql-university sqlite-db-truncate torch-tensor-parallelism
+    LPT:         true
+
+  60/60 Mean: 0.717 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 1:12:54 0:00:00
+terminal-bench • pi
+┏━━━━━━━━┳━━━━━━━━━━━━┳━━━━━━━┳━━━━━━━━┳━━━━━━━━┳━━━━━━━━┓
+┃ Trials ┃ Exceptions ┃  Mean ┃ Pass@2 ┃ Pass@4 ┃ Pass@5 ┃
+┡━━━━━━━━╇━━━━━━━━━━━━╇━━━━━━━╇━━━━━━━━╇━━━━━━━━╇━━━━━━━━┩
+│     60 │          9 │ 0.717 │  0.833 │  0.900 │  0.917 │
+└────────┴────────────┴───────┴────────┴────────┴────────┘
+
+┏━━━━━━━━┳━━━━━━━┓
+┃ Reward ┃ Count ┃
+┡━━━━━━━━╇━━━━━━━┩
+│ 1.0    │    43 │
+│ 0.0    │    17 │
+└────────┴───────┘
+
+┏━━━━━━━━━━━━━━━━━━━┳━━━━━━━┓
+┃ Exception         ┃ Count ┃
+┡━━━━━━━━━━━━━━━━━━━╇━━━━━━━┩
+│ AgentTimeoutError │     9 │
+└───────────────────┴───────┘
+
+Job Info
+Total runtime: 1h 12m 54s
+Results written to 
+/Users/ethanewer/light-agent/terminal-bench/jobs/2026-04-21__05-31-46/result.jso
+n
+Inspect results by running `harbor view 
+/Users/ethanewer/light-agent/terminal-bench/jobs`
+
+
+==> Results copied to /Users/ethanewer/light-agent/results/terminal-bench-pi-2026-04-21__10-31-45
+==> Wrote /Users/ethanewer/light-agent/terminal-bench/grug-experiment/results-grug-medium.json
+    Trials scanned:    60
+    Scored trials:     60
+    Mean reward:       0.7166666666666667
+    Total tokens:      17,133,586
+       input:          1,114,832
+       output:         394,562
+       cache read:     15,624,192
+       cache write:    0
+    Total API cost:    $12.6116
