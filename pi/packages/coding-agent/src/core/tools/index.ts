@@ -51,6 +51,13 @@ export {
 	type ReadToolOptions,
 } from "./read.js";
 export {
+	createSandboxBashOperations,
+	createSandboxBashTool,
+	createSandboxBashToolDefinition,
+	type SandboxBashToolInput,
+	type SandboxBashToolOptions,
+} from "./sandbox-bash.js";
+export {
 	DEFAULT_MAX_BYTES,
 	DEFAULT_MAX_LINES,
 	formatSize,
@@ -92,13 +99,24 @@ import { createFindTool, createFindToolDefinition, type FindToolOptions } from "
 import { createGrepTool, createGrepToolDefinition, type GrepToolOptions } from "./grep.js";
 import { createLsTool, createLsToolDefinition, type LsToolOptions } from "./ls.js";
 import { createReadTool, createReadToolDefinition, type ReadToolOptions } from "./read.js";
+import { createSandboxBashTool, createSandboxBashToolDefinition, type SandboxBashToolOptions } from "./sandbox-bash.js";
 import { createWebFetchTool, createWebFetchToolDefinition, type WebFetchToolOptions } from "./webfetch.js";
 import { createWebSearchTool, createWebSearchToolDefinition, type WebSearchToolOptions } from "./websearch.js";
 import { createWriteTool, createWriteToolDefinition, type WriteToolOptions } from "./write.js";
 
 export type Tool = AgentTool<any>;
 export type ToolDef = ToolDefinition<any, any>;
-export type ToolName = "read" | "bash" | "edit" | "write" | "grep" | "find" | "ls" | "webfetch" | "websearch";
+export type ToolName =
+	| "read"
+	| "bash"
+	| "edit"
+	| "write"
+	| "grep"
+	| "find"
+	| "ls"
+	| "webfetch"
+	| "websearch"
+	| "bash_sandbox";
 export const allToolNames: Set<ToolName> = new Set([
 	"read",
 	"bash",
@@ -109,6 +127,7 @@ export const allToolNames: Set<ToolName> = new Set([
 	"ls",
 	"webfetch",
 	"websearch",
+	"bash_sandbox",
 ]);
 
 export interface ToolsOptions {
@@ -121,6 +140,7 @@ export interface ToolsOptions {
 	ls?: LsToolOptions;
 	webfetch?: WebFetchToolOptions;
 	websearch?: WebSearchToolOptions;
+	bashSandbox?: SandboxBashToolOptions;
 }
 
 export function createToolDefinition(toolName: ToolName, cwd: string, options?: ToolsOptions): ToolDef {
@@ -143,6 +163,8 @@ export function createToolDefinition(toolName: ToolName, cwd: string, options?: 
 			return createWebFetchToolDefinition(options?.webfetch);
 		case "websearch":
 			return createWebSearchToolDefinition(options?.websearch);
+		case "bash_sandbox":
+			return createSandboxBashToolDefinition(options?.bashSandbox);
 		default:
 			throw new Error(`Unknown tool name: ${toolName}`);
 	}
@@ -168,6 +190,8 @@ export function createTool(toolName: ToolName, cwd: string, options?: ToolsOptio
 			return createWebFetchTool(options?.webfetch);
 		case "websearch":
 			return createWebSearchTool(options?.websearch);
+		case "bash_sandbox":
+			return createSandboxBashTool(options?.bashSandbox);
 		default:
 			throw new Error(`Unknown tool name: ${toolName}`);
 	}
@@ -202,6 +226,7 @@ export function createAllToolDefinitions(cwd: string, options?: ToolsOptions): R
 		ls: createLsToolDefinition(cwd, options?.ls),
 		webfetch: createWebFetchToolDefinition(options?.webfetch),
 		websearch: createWebSearchToolDefinition(options?.websearch),
+		bash_sandbox: createSandboxBashToolDefinition(options?.bashSandbox),
 	};
 }
 
@@ -234,5 +259,6 @@ export function createAllTools(cwd: string, options?: ToolsOptions): Record<Tool
 		ls: createLsTool(cwd, options?.ls),
 		webfetch: createWebFetchTool(options?.webfetch),
 		websearch: createWebSearchTool(options?.websearch),
+		bash_sandbox: createSandboxBashTool(options?.bashSandbox),
 	};
 }

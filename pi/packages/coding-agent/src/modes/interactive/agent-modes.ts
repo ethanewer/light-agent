@@ -28,6 +28,23 @@ export interface AgentMode {
  */
 const GENERAL_TOOLS = ["read", "bash", "edit", "write"] as const;
 const SEARCH_TOOLS = ["webfetch", "websearch"] as const;
+const SANDBOX_TOOLS = ["bash_sandbox"] as const;
+
+/**
+ * System prompt for the sandbox modes. The sandbox is backed by `just-bash`:
+ * an in-process virtual bash with an in-memory filesystem that cannot touch
+ * the host machine. Only the truly unintuitive bits are spelled out here;
+ * the tool description covers the rest.
+ */
+const SANDBOX_SYSTEM_PROMPT =
+	"You are running in an isolated in-memory sandbox that cannot affect the host machine. " +
+	"Use the bash_sandbox tool freely to run commands, write files, and analyze data. Its " +
+	"filesystem starts empty and persists across calls within this session. Beyond the " +
+	"standard Unix utilities, bash_sandbox provides python3 with the Python standard library; " +
+	"heavy third-party packages (numpy, pandas, torch, scikit-learn, matplotlib, etc.) are not " +
+	"installed and cannot be installed. The sandbox itself has no network access.";
+
+const SANDBOX_SEARCH_SYSTEM_PROMPT = `${SANDBOX_SYSTEM_PROMPT} Use websearch and webfetch to look up information from the web.`;
 
 /** Available agent modes, cycled in the order declared here. */
 export const AGENT_MODES: readonly AgentMode[] = [
@@ -50,6 +67,16 @@ export const AGENT_MODES: readonly AgentMode[] = [
 		name: "chat+search",
 		tools: [...SEARCH_TOOLS],
 		systemPrompt: "You are a helpful assistant.",
+	},
+	{
+		name: "sandbox",
+		tools: [...SANDBOX_TOOLS],
+		systemPrompt: SANDBOX_SYSTEM_PROMPT,
+	},
+	{
+		name: "sandbox+search",
+		tools: [...SANDBOX_TOOLS, ...SEARCH_TOOLS],
+		systemPrompt: SANDBOX_SEARCH_SYSTEM_PROMPT,
 	},
 ];
 
