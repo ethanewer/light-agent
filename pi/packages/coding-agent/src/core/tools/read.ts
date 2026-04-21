@@ -212,11 +212,11 @@ export function createReadToolDefinition(
 									imageContent = { type: "image", data: base64, mimeType };
 								}
 
-								const modelSupportsImages = !_ctx || supportsImageInput(_ctx.model);
+								const modelSupportsImages = !ctx || supportsImageInput(ctx.model);
 								if (modelSupportsImages) {
 									content = [{ type: "text", text: textNote }, imageContent];
-								} else if (_ctx && hasConfiguredVisionFallback(_ctx.modelRegistry)) {
-									const description = await describeImageFallback(_ctx, imageContent, absolutePath, signal);
+								} else if (ctx && hasConfiguredVisionFallback(ctx.modelRegistry)) {
+									const description = await describeImageFallback(ctx, imageContent, absolutePath, signal);
 									content = [
 										{
 											type: "text",

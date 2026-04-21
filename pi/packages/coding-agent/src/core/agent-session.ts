@@ -46,7 +46,6 @@ import { createToolHtmlRenderer } from "./export-html/tool-renderer.js";
 import {
 	type ContextUsage,
 	type ExtensionCommandContextActions,
-	type ExtensionContext,
 	type ExtensionErrorListener,
 	ExtensionRunner,
 	type ExtensionUIContext,
@@ -2239,64 +2238,6 @@ export class AgentSession {
 				},
 			},
 		);
-	}
-
-	private _createBuiltInToolContext(): ExtensionContext {
-		return {
-			ui: {
-				select: async () => undefined,
-				confirm: async () => false,
-				input: async () => undefined,
-				notify: () => {},
-				onTerminalInput: () => () => {},
-				setStatus: () => {},
-				setWorkingMessage: () => {},
-				setHiddenThinkingLabel: () => {},
-				setWidget: () => {},
-				setFooter: () => {},
-				setHeader: () => {},
-				setTitle: () => {},
-				custom: async () => undefined as never,
-				pasteToEditor: () => {},
-				setEditorText: () => {},
-				getEditorText: () => "",
-				editor: async () => undefined,
-				setEditorComponent: () => {},
-				get theme() {
-					return theme;
-				},
-				getAllThemes: () => [],
-				getTheme: () => undefined,
-				setTheme: (_theme: string | typeof theme) => ({ success: false, error: "UI not available" }),
-				getToolsExpanded: () => false,
-				setToolsExpanded: () => {},
-			},
-			hasUI: false,
-			cwd: this._cwd,
-			sessionManager: this.sessionManager,
-			modelRegistry: this._modelRegistry,
-			model: this.model,
-			isIdle: () => !this.isStreaming,
-			signal: this.agent.signal,
-			abort: () => this.abort(),
-			hasPendingMessages: () => this.pendingMessageCount > 0,
-			shutdown: () => {
-				this._extensionShutdownHandler?.();
-			},
-			getContextUsage: () => this.getContextUsage(),
-			compact: (options) => {
-				void (async () => {
-					try {
-						const result = await this.compact(options?.customInstructions);
-						options?.onComplete?.(result);
-					} catch (error) {
-						const err = error instanceof Error ? error : new Error(String(error));
-						options?.onError?.(err);
-					}
-				})();
-			},
-			getSystemPrompt: () => this.systemPrompt,
-		};
 	}
 
 	private _refreshToolRegistry(options?: { activeToolNames?: string[]; includeAllExtensionTools?: boolean }): void {
