@@ -330,5 +330,7 @@ ${chalk.bold("Built-in Tool Names:")}
   grep   - Search file contents (read-only, off by default)
   find   - Find files by glob pattern (read-only, off by default)
   ls     - List directory contents (read-only, off by default)
+  webfetch  - Fetch a URL as markdown/text/html (off by default)
+  websearch - Search the web (Exa), off by default
 `);
 }

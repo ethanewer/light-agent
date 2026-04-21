@@ -20,6 +20,15 @@ export interface AgentMode {
 	systemPrompt: string | null;
 }
 
+/**
+ * Default tools for "general"-flavored modes. Kept in sync with
+ * `AgentSession._buildRuntime`'s built-in default active tool names so that
+ * "general + search" extends the default set without hard-coding divergent
+ * behavior here. If the session's default ever changes, update this list too.
+ */
+const GENERAL_TOOLS = ["read", "bash", "edit", "write"] as const;
+const SEARCH_TOOLS = ["webfetch", "websearch"] as const;
+
 /** Available agent modes, cycled in the order declared here. */
 export const AGENT_MODES: readonly AgentMode[] = [
 	{
@@ -28,8 +37,18 @@ export const AGENT_MODES: readonly AgentMode[] = [
 		systemPrompt: null,
 	},
 	{
+		name: "general+search",
+		tools: [...GENERAL_TOOLS, ...SEARCH_TOOLS],
+		systemPrompt: null,
+	},
+	{
 		name: "chat",
 		tools: [],
+		systemPrompt: "You are a helpful assistant.",
+	},
+	{
+		name: "chat+search",
+		tools: [...SEARCH_TOOLS],
 		systemPrompt: "You are a helpful assistant.",
 	},
 ];
