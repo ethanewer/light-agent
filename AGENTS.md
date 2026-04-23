@@ -32,6 +32,7 @@ npm --workspace packages/ai run test              # live network + real API keys
 ```
 
 `pi-ai` tests hit real providers; their failures without credentials are environmental, not regressions. Skip them unless you changed `pi/packages/ai`.
+If the `packages/coding-agent` full suite flakes, rerun the failing test in isolation before treating it as a regression.
 
 For a single file:
 
