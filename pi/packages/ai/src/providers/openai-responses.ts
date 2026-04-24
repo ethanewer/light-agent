@@ -1,7 +1,7 @@
 import OpenAI from "openai";
 import type { ResponseCreateParamsStreaming } from "openai/resources/responses/responses.js";
 import { getEnvApiKey } from "../env-api-keys.js";
-import { supportsXhigh } from "../models.js";
+import { getDisabledOpenAIReasoningEffort, supportsXhigh } from "../models.js";
 import type {
 	Api,
 	AssistantMessage,
@@ -242,7 +242,7 @@ function buildParams(model: Model<"openai-responses">, context: Context, options
 			};
 			params.include = ["reasoning.encrypted_content"];
 		} else if (model.provider !== "github-copilot") {
-			params.reasoning = { effort: "none" };
+			params.reasoning = { effort: getDisabledOpenAIReasoningEffort(model.id) };
 		}
 	}
 

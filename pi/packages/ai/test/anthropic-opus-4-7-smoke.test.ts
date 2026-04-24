@@ -4,7 +4,7 @@ import { streamSimple } from "../src/stream.js";
 import type { Context } from "../src/types.js";
 
 interface AnthropicThinkingPayload {
-	thinking?: { type: string };
+	thinking?: { type: string; display?: string };
 	output_config?: { effort?: string };
 }
 
@@ -46,7 +46,7 @@ describe.skipIf(!process.env.ANTHROPIC_API_KEY)("Anthropic Opus 4.7 smoke", () =
 		const response = await s.result();
 		expect(response.stopReason, response.errorMessage).toBe("stop");
 		expect(response.errorMessage).toBeFalsy();
-		expect(capturedPayload?.thinking).toEqual({ type: "adaptive" });
+		expect(capturedPayload?.thinking).toEqual({ type: "adaptive", display: "summarized" });
 		expect(capturedPayload?.output_config).toEqual({ effort: "high" });
 		expect(sawThinking).toBe(true);
 

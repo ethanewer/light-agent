@@ -291,6 +291,16 @@ export async function processResponsesStream<TApi extends Api>(
 	let currentBlock: ThinkingContent | TextContent | (ToolCall & { partialJson: string }) | null = null;
 	const blocks = output.content;
 	const blockIndex = () => blocks.length - 1;
+	const currentContentIndex = () => (currentBlock ? blocks.indexOf(currentBlock) : -1);
+	const ensureThinkingBlockStarted = () => {
+		if (!currentBlock || currentBlock.type !== "thinking") return -1;
+		const existingIndex = currentContentIndex();
+		if (existingIndex !== -1) return existingIndex;
+		output.content.push(currentBlock);
+		const contentIndex = blockIndex();
+		stream.push({ type: "thinking_start", contentIndex, partial: output });
+		return contentIndex;
+	};
 
 	for await (const event of openaiStream) {
 		if (event.type === "response.created") {
@@ -300,8 +310,6 @@ export async function processResponsesStream<TApi extends Api>(
 			if (item.type === "reasoning") {
 				currentItem = item;
 				currentBlock = { type: "thinking", thinking: "" };
-				output.content.push(currentBlock);
-				stream.push({ type: "thinking_start", contentIndex: blockIndex(), partial: output });
 			} else if (item.type === "message") {
 				currentItem = item;
 				currentBlock = { type: "text", text: "" };
@@ -329,11 +337,12 @@ export async function processResponsesStream<TApi extends Api>(
 				currentItem.summary = currentItem.summary || [];
 				const lastPart = currentItem.summary[currentItem.summary.length - 1];
 				if (lastPart) {
+					const contentIndex = ensureThinkingBlockStarted();
 					currentBlock.thinking += event.delta;
 					lastPart.text += event.delta;
 					stream.push({
 						type: "thinking_delta",
-						contentIndex: blockIndex(),
+						contentIndex,
 						delta: event.delta,
 						partial: output,
 					});
@@ -344,11 +353,12 @@ export async function processResponsesStream<TApi extends Api>(
 				currentItem.summary = currentItem.summary || [];
 				const lastPart = currentItem.summary[currentItem.summary.length - 1];
 				if (lastPart) {
+					const contentIndex = ensureThinkingBlockStarted();
 					currentBlock.thinking += "\n\n";
 					lastPart.text += "\n\n";
 					stream.push({
 						type: "thinking_delta",
-						contentIndex: blockIndex(),
+						contentIndex,
 						delta: "\n\n",
 						partial: output,
 					});
@@ -430,10 +440,16 @@ export async function processResponsesStream<TApi extends Api>(
 
 			if (item.type === "reasoning" && currentBlock?.type === "thinking") {
 				currentBlock.thinking = item.summary?.map((s) => s.text).join("\n\n") || "";
+				const encryptedContent = (item as { encrypted_content?: unknown }).encrypted_content;
+				if (!currentBlock.thinking && !encryptedContent) {
+					currentBlock = null;
+					continue;
+				}
+				const contentIndex = ensureThinkingBlockStarted();
 				currentBlock.thinkingSignature = JSON.stringify(item);
 				stream.push({
 					type: "thinking_end",
-					contentIndex: blockIndex(),
+					contentIndex,
 					content: currentBlock.thinking,
 					partial: output,
 				});

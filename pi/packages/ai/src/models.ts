@@ -50,10 +50,12 @@ export function calculateCost<TApi extends Api>(model: Model<TApi>, usage: Usage
  *
  * Supported today:
  * - GPT-5.2 / GPT-5.3 / GPT-5.4 / GPT-5.5 model families
+ * - GPT-5.1 Codex Max
  * - Opus 4.6+ models (xhigh maps to adaptive effort "max" on Anthropic-compatible providers)
  */
 export function supportsXhigh<TApi extends Api>(model: Model<TApi>): boolean {
 	if (
+		model.id.includes("gpt-5.1-codex-max") ||
 		model.id.includes("gpt-5.2") ||
 		model.id.includes("gpt-5.3") ||
 		model.id.includes("gpt-5.4") ||
@@ -72,6 +74,11 @@ export function supportsXhigh<TApi extends Api>(model: Model<TApi>): boolean {
 	}
 
 	return false;
+}
+
+export function getDisabledOpenAIReasoningEffort(modelId: string): "none" | "minimal" {
+	const id = modelId.includes("/") ? modelId.split("/").pop()! : modelId;
+	return id === "gpt-5" || id === "gpt-5-mini" || id === "gpt-5-nano" ? "minimal" : "none";
 }
 
 /**

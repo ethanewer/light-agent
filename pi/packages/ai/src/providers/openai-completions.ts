@@ -552,6 +552,8 @@ function buildParams(
 			openRouterParams.reasoning = {
 				effort: mapReasoningEffort(options.reasoningEffort, compat.reasoningEffortMap),
 			};
+		} else if (model.id.startsWith("openai/")) {
+			openRouterParams.reasoning = { effort: getOpenRouterOpenAIDisabledReasoningEffort(model.id) };
 		} else {
 			openRouterParams.reasoning = { effort: "none" };
 		}
@@ -584,6 +586,11 @@ function mapReasoningEffort(
 	reasoningEffortMap: Partial<Record<NonNullable<OpenAICompletionsOptions["reasoningEffort"]>, string>>,
 ): string {
 	return reasoningEffortMap[effort] ?? effort;
+}
+
+function getOpenRouterOpenAIDisabledReasoningEffort(modelId: string): string {
+	const id = modelId.slice("openai/".length);
+	return id.startsWith("gpt-5.2") || id.startsWith("gpt-5.3") || id.startsWith("gpt-5.5") ? "low" : "minimal";
 }
 
 function getCompatCacheControl(

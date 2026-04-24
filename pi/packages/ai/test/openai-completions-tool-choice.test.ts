@@ -703,4 +703,38 @@ describe("openai-completions tool_choice", () => {
 		expect(params.reasoning).toEqual({ effort: "high" });
 		expect(params.reasoning_effort).toBeUndefined();
 	});
+
+	it.each([
+		["openai/gpt-5.2-codex", "low"],
+		["openai/gpt-5.4", "minimal"],
+	] as const)("uses enabled OpenRouter OpenAI default reasoning for %s", async (modelId, expected) => {
+		const model = getModel("openrouter", modelId)!;
+		let payload: unknown;
+
+		await streamSimple(
+			model,
+			{
+				messages: [
+					{
+						role: "user",
+						content: "Hi",
+						timestamp: Date.now(),
+					},
+				],
+			},
+			{
+				apiKey: "test",
+				onPayload: (params: unknown) => {
+					payload = params;
+				},
+			},
+		).result();
+
+		const params = (payload ?? mockState.lastParams) as {
+			reasoning?: { effort?: string };
+			reasoning_effort?: string;
+		};
+		expect(params.reasoning).toEqual({ effort: expected });
+		expect(params.reasoning_effort).toBeUndefined();
+	});
 });

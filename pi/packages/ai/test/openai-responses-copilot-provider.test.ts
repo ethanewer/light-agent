@@ -51,6 +51,41 @@ async function captureOpenAIResponseHeaders(
 	return captured;
 }
 
+async function captureOpenAIResponsePayload(
+	options: Parameters<typeof streamOpenAIResponses>[2],
+	model: Model<"openai-responses"> = getModel("openai", "gpt-5.4"),
+): Promise<unknown> {
+	let capturedPayload: unknown;
+	vi.spyOn(globalThis, "fetch").mockResolvedValue(
+		new Response("data: [DONE]\n\n", {
+			status: 200,
+			headers: { "content-type": "text/event-stream" },
+		}),
+	);
+
+	const stream = streamOpenAIResponses(
+		model,
+		{
+			systemPrompt: "sys",
+			messages: [{ role: "user", content: "hi", timestamp: Date.now() }],
+		},
+		{
+			apiKey: "test-key",
+			...options,
+			onPayload: (payload, payloadModel) => {
+				capturedPayload = payload;
+				return options?.onPayload?.(payload, payloadModel);
+			},
+		},
+	);
+
+	for await (const event of stream) {
+		if (event.type === "done" || event.type === "error") break;
+	}
+
+	return capturedPayload;
+}
+
 describe("openai-responses provider defaults", () => {
 	afterEach(() => {
 		vi.restoreAllMocks();
@@ -96,6 +131,24 @@ describe("openai-responses provider defaults", () => {
 
 		expect(captured).toEqual({ sessionId: "session-123", clientRequestId: "session-123" });
 	});
+
+	it.each([
+		["gpt-5-mini", { effort: "minimal" }],
+		["gpt-5.4", { effort: "none" }],
+	] as const)("sets disabled reasoning for %s", async (modelId, expectedReasoning) => {
+		const payload = await captureOpenAIResponsePayload({}, getModel("openai", modelId));
+
+		expect(payload).toMatchObject({ reasoning: expectedReasoning });
+	});
+
+	it.each(["minimal", "low", "medium", "high", "xhigh"] as const)(
+		"preserves gpt-5.4 %s reasoning effort",
+		async (reasoningEffort) => {
+			const payload = await captureOpenAIResponsePayload({ reasoningEffort });
+
+			expect(payload).toMatchObject({ reasoning: { effort: reasoningEffort, summary: "auto" } });
+		},
+	);
 
 	it("sets cache-affinity headers for proxy OpenAI Responses requests with a sessionId", async () => {
 		const proxyModel: Model<"openai-responses"> = {

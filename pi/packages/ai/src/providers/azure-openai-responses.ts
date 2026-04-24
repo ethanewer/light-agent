@@ -1,7 +1,7 @@
 import { AzureOpenAI } from "openai";
 import type { ResponseCreateParamsStreaming } from "openai/resources/responses/responses.js";
 import { getEnvApiKey } from "../env-api-keys.js";
-import { supportsXhigh } from "../models.js";
+import { getDisabledOpenAIReasoningEffort, supportsXhigh } from "../models.js";
 import type {
 	Api,
 	AssistantMessage,
@@ -245,7 +245,7 @@ function buildParams(
 			};
 			params.include = ["reasoning.encrypted_content"];
 		} else {
-			params.reasoning = { effort: "none" };
+			params.reasoning = { effort: getDisabledOpenAIReasoningEffort(model.id) };
 		}
 	}
 

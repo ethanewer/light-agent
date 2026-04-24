@@ -461,7 +461,11 @@ describe("openai-codex streaming", () => {
 		expect(requestedReasoning).toEqual({ effort: "xhigh", summary: "auto" });
 	});
 
-	it.each(["gpt-5.3-codex", "gpt-5.4", "gpt-5.5"])("clamps %s minimal reasoning effort to low", async (modelId) => {
+	it.each([
+		["gpt-5.3-codex", { effort: "low", summary: "auto" }],
+		["gpt-5.4", { effort: "minimal", summary: "auto" }],
+		["gpt-5.5", { effort: "low", summary: "auto" }],
+	] as const)("handles %s minimal reasoning effort", async (modelId, expectedReasoning) => {
 		const tempDir = mkdtempSync(join(tmpdir(), "pi-codex-stream-"));
 		process.env.PI_CODING_AGENT_DIR = tempDir;
 
@@ -520,7 +524,7 @@ describe("openai-codex streaming", () => {
 			}
 			if (url === "https://chatgpt.com/backend-api/codex/responses") {
 				const body = typeof init?.body === "string" ? (JSON.parse(init.body) as Record<string, unknown>) : null;
-				expect(body?.reasoning).toEqual({ effort: "low", summary: "auto" });
+				expect(body?.reasoning).toEqual(expectedReasoning);
 
 				return new Response(stream, {
 					status: 200,
