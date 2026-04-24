@@ -1,5 +1,12 @@
 # Changelog
 
+## [Unreleased]
+
+### Added
+
+- Added Tab-to-cycle agent modes in the interactive TUI. Pressing Tab on an empty editor now cycles through declarative personas (currently `general`, `general+search`, `chat`, and `chat+search`), each of which can pin a specific tool set and/or override the system prompt. The `general` mode preserves whatever tool set the session was configured with, and cycling back restores it. Added `AgentSession.setSystemPrompt()` for raw system-prompt overrides, and a `CustomEditor.onTab` hook that fires only when the buffer is empty and autocomplete is inactive, so normal tab completion and literal tab insertion are unaffected.
+- Added built-in `webfetch` and `websearch` tools (off by default). `webfetch` fetches a URL and returns the body as markdown, text, or HTML (images are returned as image content blocks); `websearch` queries the Exa MCP endpoint for up-to-date search results. Both tools expose a pluggable `operations.fetch` hook so SDK embedders can route traffic through a custom transport.
+
 ## [0.70.0] - 2026-04-23
 
 ### New Features

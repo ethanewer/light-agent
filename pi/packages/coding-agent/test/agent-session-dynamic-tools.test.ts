@@ -179,4 +179,36 @@ describe("AgentSession dynamic tool registration", () => {
 
 		session.dispose();
 	});
+
+	it("keeps raw system prompt overrides across tool rebuilds until cleared", async () => {
+		const settingsManager = SettingsManager.create(tempDir, agentDir);
+		const sessionManager = SessionManager.inMemory();
+		const resourceLoader = new DefaultResourceLoader({
+			cwd: tempDir,
+			agentDir,
+			settingsManager,
+		});
+		await resourceLoader.reload();
+
+		const { session } = await createAgentSession({
+			cwd: tempDir,
+			agentDir,
+			model: getModel("anthropic", "claude-sonnet-4-5")!,
+			settingsManager,
+			sessionManager,
+			resourceLoader,
+		});
+
+		session.setSystemPrompt("You are a helpful assistant.");
+		session.setActiveToolsByName(["webfetch", "websearch"]);
+
+		expect(session.systemPrompt).toBe("You are a helpful assistant.");
+		expect(session.getActiveToolNames()).toEqual(["webfetch", "websearch"]);
+
+		session.clearSystemPromptOverride();
+
+		expect(session.systemPrompt).toContain("- webfetch:");
+		expect(session.systemPrompt).toContain("- websearch:");
+		session.dispose();
+	});
 });

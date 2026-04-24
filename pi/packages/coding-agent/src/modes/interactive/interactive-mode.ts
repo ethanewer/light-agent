@@ -92,6 +92,7 @@ import { extensionForImageMimeType, readClipboardImage } from "../../utils/clipb
 import { parseGitUrl } from "../../utils/git.js";
 import { killTrackedDetachedChildren } from "../../utils/shell.js";
 import { ensureTool } from "../../utils/tools-manager.js";
+import { AGENT_MODES, type AgentMode, nextAgentMode } from "./agent-modes.js";
 import { VoiceController } from "./audio/voice-controller.js";
 import { ArminComponent } from "./components/armin.js";
 import { AssistantMessageComponent } from "./components/assistant-message.js";
@@ -395,6 +396,12 @@ export class InteractiveMode {
 	// or the transcript.
 	private voiceOriginalOnSubmit?: EditorComponent["onSubmit"];
 	private voicePendingSubmit?: string;
+
+	// Agent-mode cycling (Tab on an empty editor). `defaultToolNames` is
+	// captured lazily on first switch so it reflects whatever the session
+	// was built with.
+	private currentAgentModeName: string = AGENT_MODES[0]?.name ?? "general";
+	private defaultAgentToolNames: string[] | undefined;
 
 	// Built-in header (logo + keybinding hints + changelog)
 	private builtInHeader: Component | undefined = undefined;
@@ -1680,6 +1687,7 @@ export class InteractiveMode {
 	}
 
 	private renderCurrentSessionState(): void {
+		this.resetAgentModeState();
 		this.chatContainer.clear();
 		this.pendingMessagesContainer.clear();
 		this.compactionQueuedMessages = [];
@@ -2303,6 +2311,11 @@ export class InteractiveMode {
 				if (!customEditor.placeholderLine) {
 					customEditor.placeholderLine = this.defaultEditor.placeholderLine;
 				}
+				// Forward the agent-mode tab hook so cycling keeps working when
+				// an extension swaps in a custom editor.
+				if (!customEditor.onTab) {
+					customEditor.onTab = () => this.defaultEditor.onTab?.() ?? false;
+				}
 				// Copy action handlers (clear, suspend, model switching, etc.)
 				for (const [action, handler] of this.defaultEditor.actionHandlers) {
 					(customEditor.actionHandlers as Map<string, () => void>).set(action, handler);
@@ -2502,6 +2515,54 @@ export class InteractiveMode {
 		this.defaultEditor.onPasteImage = () => {
 			this.handleClipboardImagePaste();
 		};
+
+		// Tab on empty editor cycles agent modes (general / chat / …).
+		this.defaultEditor.onTab = () => this.handleAgentModeTab();
+	}
+
+	/**
+	 * Cycle the active agent mode when Tab is pressed on an empty editor.
+	 * Returns true to consume the key; false lets normal tab handling run.
+	 */
+	private handleAgentModeTab(): boolean {
+		// Don't interfere mid-recording / mid-transcription.
+		const vc = this.voiceController;
+		if (vc && (vc.isRecording() || vc.isTranscribing())) {
+			return false;
+		}
+		if (AGENT_MODES.length < 2) return false;
+
+		// Capture the session's current tool set the first time we switch so we
+		// can restore it when cycling back to a mode with `tools: null`. Lazy
+		// capture is fine: the "general" mode is defined as "whatever the
+		// session is currently configured with", so snapshotting at first switch
+		// preserves any earlier extension / user tool tweaks.
+		if (this.defaultAgentToolNames === undefined) {
+			this.defaultAgentToolNames = this.session.getActiveToolNames();
+		}
+
+		const mode = nextAgentMode(this.currentAgentModeName);
+		this.applyAgentMode(mode);
+		return true;
+	}
+
+	private resetAgentModeState(): void {
+		this.currentAgentModeName = AGENT_MODES[0]?.name ?? "general";
+		this.defaultAgentToolNames = undefined;
+	}
+
+	private applyAgentMode(mode: AgentMode): void {
+		const toolNames = mode.tools === null ? (this.defaultAgentToolNames ?? []) : [...mode.tools];
+		// setActiveToolsByName rebuilds the default system prompt; apply or clear
+		// the mode-specific override after that rebuild.
+		this.session.setActiveToolsByName(toolNames);
+		if (mode.systemPrompt !== null) {
+			this.session.setSystemPrompt(mode.systemPrompt);
+		} else {
+			this.session.clearSystemPromptOverride();
+		}
+		this.currentAgentModeName = mode.name;
+		this.showStatus(`Switched to ${mode.name} mode`);
 	}
 
 	private async handleClipboardImagePaste(): Promise<void> {

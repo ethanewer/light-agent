@@ -304,6 +304,7 @@ export class AgentSession {
 	// Base system prompt (without extension appends) - used to apply fresh appends each turn
 	private _baseSystemPrompt = "";
 	private _baseSystemPromptOptions!: BuildSystemPromptOptions;
+	private _systemPromptOverride: string | undefined;
 
 	constructor(config: AgentSessionConfig) {
 		this.agent = config.agent;
@@ -809,6 +810,27 @@ export class AgentSession {
 
 		// Rebuild base system prompt with new tool set
 		this._baseSystemPrompt = this._rebuildSystemPrompt(validToolNames);
+		this.agent.state.systemPrompt = this._getEffectiveBaseSystemPrompt();
+	}
+
+	/**
+	 * Override the base system prompt with a raw string.
+	 *
+	 * Bypasses the normal prompt-building pipeline (tool snippets, skills,
+	 * context files, etc.). The override persists until
+	 * `clearSystemPromptOverride` is called.
+	 * Changes take effect on the next agent turn.
+	 */
+	setSystemPrompt(prompt: string): void {
+		this._systemPromptOverride = prompt;
+		this.agent.state.systemPrompt = this._getEffectiveBaseSystemPrompt();
+	}
+
+	/**
+	 * Clear a raw system-prompt override and restore the normally-built prompt.
+	 */
+	clearSystemPromptOverride(): void {
+		this._systemPromptOverride = undefined;
 		this.agent.state.systemPrompt = this._baseSystemPrompt;
 	}
 
@@ -888,6 +910,10 @@ export class AgentSession {
 			}
 		}
 		return Array.from(unique);
+	}
+
+	private _getEffectiveBaseSystemPrompt(): string {
+		return this._systemPromptOverride ?? this._baseSystemPrompt;
 	}
 
 	private _rebuildSystemPrompt(toolNames: string[]): string {
@@ -1045,10 +1071,11 @@ export class AgentSession {
 			this._pendingNextTurnMessages = [];
 
 			// Emit before_agent_start extension event
+			const baseSystemPrompt = this._getEffectiveBaseSystemPrompt();
 			const result = await this._extensionRunner.emitBeforeAgentStart(
 				expandedText,
 				currentImages,
-				this._baseSystemPrompt,
+				baseSystemPrompt,
 				this._baseSystemPromptOptions,
 			);
 			// Add all custom messages from extensions
@@ -1069,7 +1096,7 @@ export class AgentSession {
 				this.agent.state.systemPrompt = result.systemPrompt;
 			} else {
 				// Ensure we're using the base prompt (in case previous turn had modifications)
-				this.agent.state.systemPrompt = this._baseSystemPrompt;
+				this.agent.state.systemPrompt = baseSystemPrompt;
 			}
 		} catch (error) {
 			preflightResult?.(false);
@@ -2070,7 +2097,7 @@ export class AgentSession {
 
 		this._resourceLoader.extendResources(extensionPaths);
 		this._baseSystemPrompt = this._rebuildSystemPrompt(this.getActiveToolNames());
-		this.agent.state.systemPrompt = this._baseSystemPrompt;
+		this.agent.state.systemPrompt = this._getEffectiveBaseSystemPrompt();
 	}
 
 	private buildExtensionResourcePaths(entries: Array<{ path: string; extensionPath: string }>): Array<{
