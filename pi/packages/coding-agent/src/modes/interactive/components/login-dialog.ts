@@ -30,18 +30,21 @@ export class LoginDialogComponent extends Container implements Focusable {
 		tui: TUI,
 		providerId: string,
 		private onComplete: (success: boolean, message?: string) => void,
+		providerNameOverride?: string,
+		titleOverride?: string,
 	) {
 		super();
 		this.tui = tui;
 
 		const providerInfo = getOAuthProviders().find((p) => p.id === providerId);
-		const providerName = providerInfo?.name || providerId;
+		const providerName = providerNameOverride || providerInfo?.name || providerId;
+		const title = titleOverride ?? `Login to ${providerName}`;
 
 		// Top border
 		this.addChild(new DynamicBorder());
 
 		// Title
-		this.addChild(new Text(theme.fg("warning", `Login to ${providerName}`), 1, 0));
+		this.addChild(new Text(theme.fg("accent", theme.bold(title)), 1, 0));
 
 		// Dynamic content area
 		this.contentContainer = new Container();
@@ -106,6 +109,7 @@ export class LoginDialogComponent extends Container implements Focusable {
 	 * Show input for manual code/URL entry (for callback server providers)
 	 */
 	showManualInput(prompt: string): Promise<string> {
+		this.input.setMask(undefined);
 		this.contentContainer.addChild(new Spacer(1));
 		this.contentContainer.addChild(new Text(theme.fg("dim", prompt), 1, 0));
 		this.contentContainer.addChild(this.input);
@@ -122,7 +126,8 @@ export class LoginDialogComponent extends Container implements Focusable {
 	 * Called by onPrompt callback - show prompt and wait for input
 	 * Note: Does NOT clear content, appends to existing (preserves URL from showAuth)
 	 */
-	showPrompt(message: string, placeholder?: string): Promise<string> {
+	showPrompt(message: string, placeholder?: string, options?: { mask?: string }): Promise<string> {
+		this.input.setMask(options?.mask);
 		this.contentContainer.addChild(new Spacer(1));
 		this.contentContainer.addChild(new Text(theme.fg("text", message), 1, 0));
 		if (placeholder) {
@@ -144,6 +149,20 @@ export class LoginDialogComponent extends Container implements Focusable {
 			this.inputResolver = resolve;
 			this.inputRejecter = reject;
 		});
+	}
+
+	/**
+	 * Show informational text without prompting for input.
+	 */
+	showInfo(lines: string[]): void {
+		this.contentContainer.clear();
+		this.contentContainer.addChild(new Spacer(1));
+		for (const line of lines) {
+			this.contentContainer.addChild(new Text(line, 1, 0));
+		}
+		this.contentContainer.addChild(new Spacer(1));
+		this.contentContainer.addChild(new Text(`(${keyHint("tui.select.cancel", "to close")})`, 1, 0));
+		this.tui.requestRender();
 	}
 
 	/**

@@ -100,6 +100,86 @@ describe("InteractiveMode.setToolsExpanded", () => {
 	});
 });
 
+describe("InteractiveMode terminal progress", () => {
+	test("clears progress that was started before the setting was disabled", () => {
+		let showTerminalProgress = true;
+		const setProgress = vi.fn();
+		const fakeThis: any = {
+			terminalProgressActive: false,
+			settingsManager: {
+				getShowTerminalProgress: () => showTerminalProgress,
+			},
+			ui: {
+				terminal: { setProgress },
+			},
+		};
+
+		(InteractiveMode as any).prototype.setTerminalProgress.call(fakeThis, true);
+		showTerminalProgress = false;
+		(InteractiveMode as any).prototype.setTerminalProgress.call(fakeThis, false);
+		(InteractiveMode as any).prototype.setTerminalProgress.call(fakeThis, false);
+
+		expect(setProgress).toHaveBeenCalledTimes(2);
+		expect(setProgress).toHaveBeenNthCalledWith(1, true);
+		expect(setProgress).toHaveBeenNthCalledWith(2, false);
+		expect(fakeThis.terminalProgressActive).toBe(false);
+	});
+
+	test("does not emit terminal progress sequences when the setting is disabled before start", () => {
+		const setProgress = vi.fn();
+		const fakeThis: any = {
+			terminalProgressActive: false,
+			settingsManager: {
+				getShowTerminalProgress: () => false,
+			},
+			ui: {
+				terminal: { setProgress },
+			},
+		};
+
+		(InteractiveMode as any).prototype.setTerminalProgress.call(fakeThis, true);
+		(InteractiveMode as any).prototype.setTerminalProgress.call(fakeThis, false);
+
+		expect(setProgress).not.toHaveBeenCalled();
+	});
+});
+
+describe("InteractiveMode provider auth completion", () => {
+	test("refreshes model registry through the session after authentication", async () => {
+		const refreshModelRegistryState = vi.fn();
+		const modelRegistryRefresh = vi.fn();
+		const fakeThis: any = {
+			session: {
+				model: undefined,
+				modelRegistry: {
+					refresh: modelRegistryRefresh,
+				},
+				refreshModelRegistryState,
+			},
+			updateAvailableProviderCount: vi.fn().mockResolvedValue(undefined),
+			footer: { invalidate: vi.fn() },
+			updateEditorBorderColor: vi.fn(),
+			showStatus: vi.fn(),
+			showError: vi.fn(),
+			maybeWarnAboutAnthropicSubscriptionAuth: vi.fn().mockResolvedValue(undefined),
+			checkDaxnutsEasterEgg: vi.fn(),
+		};
+
+		await (InteractiveMode as any).prototype.completeProviderAuthentication.call(
+			fakeThis,
+			"openai",
+			"OpenAI",
+			"api_key",
+			undefined,
+		);
+
+		expect(refreshModelRegistryState).toHaveBeenCalledTimes(1);
+		expect(modelRegistryRefresh).not.toHaveBeenCalled();
+		expect(fakeThis.updateAvailableProviderCount).toHaveBeenCalledTimes(1);
+		expect(fakeThis.footer.invalidate).toHaveBeenCalledTimes(1);
+	});
+});
+
 describe("InteractiveMode.createExtensionUIContext setTheme", () => {
 	test("persists theme changes to settings manager", () => {
 		initTheme("dark");
@@ -262,6 +342,8 @@ describe("InteractiveMode.showLoadedResources", () => {
 				},
 			},
 			formatDisplayPath: (p: string) => (InteractiveMode as any).prototype.formatDisplayPath.call(fakeThis, p),
+			formatExtensionDisplayPath: (p: string) =>
+				(InteractiveMode as any).prototype.formatExtensionDisplayPath.call(fakeThis, p),
 			formatContextPath: (p: string) => (InteractiveMode as any).prototype.formatContextPath.call(fakeThis, p),
 			getStartupExpansionState: () => (InteractiveMode as any).prototype.getStartupExpansionState.call(fakeThis),
 			buildScopeGroups: () => [],
@@ -482,7 +564,7 @@ describe("InteractiveMode.showLoadedResources", () => {
 
 		expect(normalizeRenderedOutput(fakeThis.chatContainer)).toMatchInlineSnapshot(`
 "[Extensions]
-  @scope/pi-scoped, answer.ts, cli-extension.ts, HazAT/pi-interactive-subagents, HazAT/pi-interactive-subagents:subagents, local-index/index.ts, pi-markdown-preview, user-index/index.ts"`);
+  @scope/pi-scoped, answer.ts, cli-extension.ts, HazAT/pi-interactive-subagents, HazAT/pi-interactive-subagents:subagents, local-index, pi-markdown-preview, user-index"`);
 	});
 
 	test("adds more parent folders until local extension labels are unique", () => {
@@ -528,9 +610,231 @@ describe("InteractiveMode.showLoadedResources", () => {
 
 		expect(normalizeRenderedOutput(fakeThis.chatContainer)).toMatchInlineSnapshot(`
 "[Extensions]
-  alpha/one/index.ts, beta/one/index.ts, gamma/one/index.ts"`);
+  alpha/one, beta/one, gamma/one"`);
 	});
 
+	test("strips index.ts from local extension label, showing parent dir", () => {
+		const extensions: ExtensionFixture[] = [
+			{
+				path: "/tmp/extensions/plan-mode/index.ts",
+				sourceInfo: createSourceInfo("/tmp/extensions/plan-mode/index.ts", {
+					source: "local",
+					scope: "project",
+					origin: "top-level",
+					baseDir: "/tmp/extensions",
+				}),
+			},
+		];
+
+		const fakeThis = createShowLoadedResourcesThis({
+			quietStartup: false,
+			extensions,
+			useRealScopeGroups: true,
+		});
+
+		(InteractiveMode as any).prototype.showLoadedResources.call(fakeThis, {
+			force: false,
+		});
+
+		expect(normalizeRenderedOutput(fakeThis.chatContainer)).toMatchInlineSnapshot(`
+"[Extensions]
+  plan-mode"`);
+	});
+
+	test("strips index.js from local extension label, showing parent dir", () => {
+		const extensions: ExtensionFixture[] = [
+			{
+				path: "/tmp/extensions/plan-mode/index.js",
+				sourceInfo: createSourceInfo("/tmp/extensions/plan-mode/index.js", {
+					source: "local",
+					scope: "project",
+					origin: "top-level",
+					baseDir: "/tmp/extensions",
+				}),
+			},
+		];
+
+		const fakeThis = createShowLoadedResourcesThis({
+			quietStartup: false,
+			extensions,
+			useRealScopeGroups: true,
+		});
+
+		(InteractiveMode as any).prototype.showLoadedResources.call(fakeThis, {
+			force: false,
+		});
+
+		expect(normalizeRenderedOutput(fakeThis.chatContainer)).toMatchInlineSnapshot(`
+"[Extensions]
+  plan-mode"`);
+	});
+
+	test("mixed single-file and subdirectory index.ts extensions strip index.ts", () => {
+		const extensions: ExtensionFixture[] = [
+			{
+				path: "/tmp/extensions/webfetch.ts",
+				sourceInfo: createSourceInfo("/tmp/extensions/webfetch.ts", {
+					source: "local",
+					scope: "project",
+					origin: "top-level",
+					baseDir: "/tmp/extensions",
+				}),
+			},
+			{
+				path: "/tmp/extensions/plan-mode/index.ts",
+				sourceInfo: createSourceInfo("/tmp/extensions/plan-mode/index.ts", {
+					source: "local",
+					scope: "project",
+					origin: "top-level",
+					baseDir: "/tmp/extensions",
+				}),
+			},
+		];
+
+		const fakeThis = createShowLoadedResourcesThis({
+			quietStartup: false,
+			extensions,
+			useRealScopeGroups: true,
+		});
+
+		(InteractiveMode as any).prototype.showLoadedResources.call(fakeThis, {
+			force: false,
+		});
+
+		expect(normalizeRenderedOutput(fakeThis.chatContainer)).toMatchInlineSnapshot(`
+"[Extensions]
+  plan-mode, webfetch.ts"`);
+	});
+
+	test("multiple index.ts with unique parent dirs need no disambiguation", () => {
+		const extensions: ExtensionFixture[] = [
+			{
+				path: "/tmp/extensions/foo/index.ts",
+				sourceInfo: createSourceInfo("/tmp/extensions/foo/index.ts", {
+					source: "local",
+					scope: "project",
+					origin: "top-level",
+					baseDir: "/tmp/extensions",
+				}),
+			},
+			{
+				path: "/tmp/extensions/bar/index.ts",
+				sourceInfo: createSourceInfo("/tmp/extensions/bar/index.ts", {
+					source: "local",
+					scope: "project",
+					origin: "top-level",
+					baseDir: "/tmp/extensions",
+				}),
+			},
+		];
+
+		const fakeThis = createShowLoadedResourcesThis({
+			quietStartup: false,
+			extensions,
+			useRealScopeGroups: true,
+		});
+
+		(InteractiveMode as any).prototype.showLoadedResources.call(fakeThis, {
+			force: false,
+		});
+
+		expect(normalizeRenderedOutput(fakeThis.chatContainer)).toMatchInlineSnapshot(`
+"[Extensions]
+  bar, foo"`);
+	});
+
+	test("multiple index.ts with same parent dir name disambiguated with grandparent", () => {
+		const extensions: ExtensionFixture[] = [
+			{
+				path: "/tmp/alpha/tools/index.ts",
+				sourceInfo: createSourceInfo("/tmp/alpha/tools/index.ts", {
+					source: "cli",
+					scope: "temporary",
+					origin: "top-level",
+					baseDir: "/tmp/alpha",
+				}),
+			},
+			{
+				path: "/tmp/beta/tools/index.ts",
+				sourceInfo: createSourceInfo("/tmp/beta/tools/index.ts", {
+					source: "cli",
+					scope: "temporary",
+					origin: "top-level",
+					baseDir: "/tmp/beta",
+				}),
+			},
+		];
+
+		const fakeThis = createShowLoadedResourcesThis({
+			quietStartup: false,
+			extensions,
+			useRealScopeGroups: true,
+		});
+
+		(InteractiveMode as any).prototype.showLoadedResources.call(fakeThis, {
+			force: false,
+		});
+
+		expect(normalizeRenderedOutput(fakeThis.chatContainer)).toMatchInlineSnapshot(`
+"[Extensions]
+  alpha/tools, beta/tools"`);
+	});
+
+	test("non-index file in subdirectory stays as filename", () => {
+		const extensions: ExtensionFixture[] = [
+			{
+				path: "/tmp/extensions/my-ext/main.ts",
+				sourceInfo: createSourceInfo("/tmp/extensions/my-ext/main.ts", {
+					source: "local",
+					scope: "project",
+					origin: "top-level",
+					baseDir: "/tmp/extensions",
+				}),
+			},
+		];
+
+		const fakeThis = createShowLoadedResourcesThis({
+			quietStartup: false,
+			extensions,
+			useRealScopeGroups: true,
+		});
+
+		(InteractiveMode as any).prototype.showLoadedResources.call(fakeThis, {
+			force: false,
+		});
+
+		expect(normalizeRenderedOutput(fakeThis.chatContainer)).toMatchInlineSnapshot(`
+"[Extensions]
+  main.ts"`);
+	});
+
+	test("package extensions still strip index.ts correctly (regression guard)", () => {
+		const extensions: ExtensionFixture[] = [
+			{
+				path: "/tmp/project/.pi/npm/node_modules/pi-markdown-preview/extensions/index.ts",
+				sourceInfo: createSourceInfo("/tmp/project/.pi/npm/node_modules/pi-markdown-preview/extensions/index.ts", {
+					source: "npm:pi-markdown-preview",
+					scope: "project",
+					origin: "package",
+					baseDir: "/tmp/project/.pi/npm/node_modules/pi-markdown-preview",
+				}),
+			},
+		];
+
+		const fakeThis = createShowLoadedResourcesThis({
+			quietStartup: false,
+			extensions,
+			useRealScopeGroups: true,
+		});
+
+		(InteractiveMode as any).prototype.showLoadedResources.call(fakeThis, {
+			force: false,
+		});
+
+		expect(normalizeRenderedOutput(fakeThis.chatContainer)).toMatchInlineSnapshot(`
+"[Extensions]
+  pi-markdown-preview"`);
+	});
 	test("captures mixed extension layouts in expanded output", () => {
 		const fakeThis = createShowLoadedResourcesThis({
 			quietStartup: false,
@@ -547,16 +851,16 @@ describe("InteractiveMode.showLoadedResources", () => {
 "[Extensions]
   project
     /tmp/project/.pi/extensions/answer.ts
-    /tmp/project/.pi/extensions/local-index/index.ts
+    /tmp/project/.pi/extensions/local-index
     git:github.com/HazAT/pi-interactive-subagents
-      extensions/index.ts
-      extensions/subagents/index.ts
+      extensions
+      extensions/subagents
     npm:@scope/pi-scoped
-      extensions/index.ts
+      extensions
     npm:pi-markdown-preview
-      extensions/index.ts
+      extensions
   user
-    /tmp/agent/extensions/user-index/index.ts
+    /tmp/agent/extensions/user-index
   path
     /tmp/temp/cli-extension.ts"`);
 	});

@@ -1,7 +1,7 @@
 import { existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import type { Api, Context, Model, OpenAICompletionsCompat } from "@mariozechner/pi-ai";
+import type { AnthropicMessagesCompat, Api, Context, Model, OpenAICompletionsCompat } from "@mariozechner/pi-ai";
 import { getApiProvider } from "@mariozechner/pi-ai";
 import { getOAuthProvider } from "@mariozechner/pi-ai/oauth";
 import { afterEach, beforeEach, describe, expect, test, vi } from "vitest";
@@ -890,6 +890,64 @@ describe("ModelRegistry", () => {
 			expect(compat?.cacheControlFormat).toBe("anthropic");
 		});
 
+		test("compat schema accepts Anthropic eager tool input streaming flag", () => {
+			writeRawModelsJson({
+				demo: {
+					baseUrl: "https://example.com",
+					apiKey: "DEMO_KEY",
+					api: "anthropic-messages",
+					compat: {
+						supportsEagerToolInputStreaming: false,
+					},
+					models: [
+						{
+							id: "demo-model",
+							reasoning: true,
+							input: ["text"],
+							cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0 },
+							contextWindow: 1000,
+							maxTokens: 100,
+						},
+					],
+				},
+			});
+
+			const registry = ModelRegistry.create(authStorage, modelsJsonPath);
+			const compat = registry.find("demo", "demo-model")?.compat as AnthropicMessagesCompat | undefined;
+
+			expect(registry.getError()).toBeUndefined();
+			expect(compat?.supportsEagerToolInputStreaming).toBe(false);
+		});
+
+		test("compat schema accepts long cache retention flag", () => {
+			writeRawModelsJson({
+				demo: {
+					baseUrl: "https://example.com",
+					apiKey: "DEMO_KEY",
+					api: "anthropic-messages",
+					compat: {
+						supportsLongCacheRetention: false,
+					},
+					models: [
+						{
+							id: "demo-model",
+							reasoning: true,
+							input: ["text"],
+							cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0 },
+							contextWindow: 1000,
+							maxTokens: 100,
+						},
+					],
+				},
+			});
+
+			const registry = ModelRegistry.create(authStorage, modelsJsonPath);
+			const compat = registry.find("demo", "demo-model")?.compat as AnthropicMessagesCompat | undefined;
+
+			expect(registry.getError()).toBeUndefined();
+			expect(compat?.supportsLongCacheRetention).toBe(false);
+		});
+
 		test("model-level baseUrl overrides provider-level baseUrl for custom models", () => {
 			writeRawModelsJson({
 				"opencode-go": {
@@ -1486,6 +1544,45 @@ describe("ModelRegistry", () => {
 			const apiKey = await registry.getApiKeyForProvider("custom-provider");
 
 			expect(apiKey).toBe("hello-world");
+		});
+
+		test("auth status reports models.json provider API key without exposing it", () => {
+			writeRawModelsJson({
+				"custom-provider": providerWithApiKey("models-json-secret-key"),
+			});
+
+			const registry = ModelRegistry.create(authStorage, modelsJsonPath);
+			const status = registry.getAuthStatus("custom-provider");
+
+			expect(status).toEqual({ configured: false, source: "fallback", label: "custom provider config" });
+			expect(JSON.stringify(status)).not.toContain("models-json-secret-key");
+		});
+
+		test("auth status keeps environment precedence over models.json provider API key", () => {
+			const originalEnv = process.env.OPENAI_API_KEY;
+			process.env.OPENAI_API_KEY = "env-secret-key";
+
+			try {
+				writeRawModelsJson({
+					openai: {
+						baseUrl: "https://example.com/v1",
+						apiKey: "models-json-secret-key",
+					},
+				});
+
+				const registry = ModelRegistry.create(authStorage, modelsJsonPath);
+				const status = registry.getAuthStatus("openai");
+
+				expect(status).toEqual({ configured: false, source: "environment", label: "OPENAI_API_KEY" });
+				expect(JSON.stringify(status)).not.toContain("env-secret-key");
+				expect(JSON.stringify(status)).not.toContain("models-json-secret-key");
+			} finally {
+				if (originalEnv === undefined) {
+					delete process.env.OPENAI_API_KEY;
+				} else {
+					process.env.OPENAI_API_KEY = originalEnv;
+				}
+			}
 		});
 
 		describe("request-time resolution", () => {

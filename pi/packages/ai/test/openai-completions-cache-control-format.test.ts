@@ -26,6 +26,8 @@ interface CapturedParams {
 		content: string | TextPart[] | null;
 	}>;
 	tools?: ToolWithCacheControl[];
+	prompt_cache_key?: string;
+	prompt_cache_retention?: string;
 }
 
 const mockState = vi.hoisted(() => ({
@@ -121,6 +123,27 @@ function expectAnthropicCacheMarkers(params: CapturedParams): void {
 	expect((lastMessage.content as TextPart[])[0]?.cache_control).toEqual({ type: "ephemeral" });
 }
 
+function expectAnthropicCacheMarkersWithTtl(params: CapturedParams): void {
+	const instructionMessage = getInstructionMessage(params);
+	expect(instructionMessage).toBeDefined();
+	expect(Array.isArray(instructionMessage?.content)).toBe(true);
+	expect((instructionMessage?.content as TextPart[])[0]?.cache_control).toEqual({
+		type: "ephemeral",
+		ttl: "1h",
+	});
+
+	expect(params.tools).toHaveLength(1);
+	expect(params.tools?.[0]?.cache_control).toEqual({ type: "ephemeral", ttl: "1h" });
+
+	const lastMessage = params.messages[params.messages.length - 1];
+	expect(lastMessage.role).toBe("user");
+	expect(Array.isArray(lastMessage.content)).toBe(true);
+	expect((lastMessage.content as TextPart[])[0]?.cache_control).toEqual({
+		type: "ephemeral",
+		ttl: "1h",
+	});
+}
+
 describe("openai-completions cacheControlFormat", () => {
 	beforeEach(() => {
 		mockState.lastParams = undefined;
@@ -185,5 +208,34 @@ describe("openai-completions cacheControlFormat", () => {
 		expect(Array.isArray(instructionMessage?.content)).toBe(false);
 		expect(params.tools?.[0]?.cache_control).toBeUndefined();
 		expect(typeof params.messages[params.messages.length - 1]?.content).toBe("string");
+	});
+
+	it("uses Anthropic ttl instead of OpenAI prompt cache retention for Anthropic-style long retention", async () => {
+		const model: Model<"openai-completions"> = {
+			id: "custom-anthropic-compatible",
+			name: "Custom Anthropic Compatible",
+			api: "openai-completions",
+			provider: "custom",
+			baseUrl: "https://example.com/v1",
+			reasoning: true,
+			input: ["text"],
+			cost: {
+				input: 0,
+				output: 0,
+				cacheRead: 0,
+				cacheWrite: 0,
+			},
+			contextWindow: 128000,
+			maxTokens: 32000,
+			compat: {
+				cacheControlFormat: "anthropic",
+				supportsLongCacheRetention: true,
+			},
+		};
+
+		const params = await capturePayload(model, { cacheRetention: "long" });
+		expectAnthropicCacheMarkersWithTtl(params);
+		expect(params.prompt_cache_key).toBeUndefined();
+		expect(params.prompt_cache_retention).toBeUndefined();
 	});
 });

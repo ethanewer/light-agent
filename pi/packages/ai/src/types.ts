@@ -296,11 +296,30 @@ export interface OpenAICompletionsCompat {
 	cacheControlFormat?: "anthropic";
 	/** Whether to send known session-affinity headers (`session_id`, `x-client-request-id`, `x-session-affinity`) from `options.sessionId` when caching is enabled. Default: false. */
 	sendSessionAffinityHeaders?: boolean;
+	/** Whether the provider supports long prompt cache retention (`prompt_cache_retention: "24h"` or Anthropic-style `cache_control.ttl: "1h"`, depending on format). Defaults to true only for known official OpenAI/Anthropic API URLs. */
+	supportsLongCacheRetention?: boolean;
 }
 
 /** Compatibility settings for OpenAI Responses APIs. */
 export interface OpenAIResponsesCompat {
-	// Reserved for future use
+	/** Whether to send the OpenAI `session_id` cache-affinity header from `options.sessionId` when caching is enabled. Default: true. */
+	sendSessionIdHeader?: boolean;
+	/** Whether the provider supports `prompt_cache_retention: "24h"`. Defaults to true only for known official OpenAI API URLs. */
+	supportsLongCacheRetention?: boolean;
+}
+
+/** Compatibility settings for Anthropic Messages-compatible APIs. */
+export interface AnthropicMessagesCompat {
+	/**
+	 * Whether the provider accepts per-tool `eager_input_streaming`.
+	 * When false, the Anthropic provider omits `tools[].eager_input_streaming`
+	 * and sends the legacy `fine-grained-tool-streaming-2025-05-14` beta header
+	 * for tool-enabled requests.
+	 * Default: true.
+	 */
+	supportsEagerToolInputStreaming?: boolean;
+	/** Whether the provider supports Anthropic long cache retention (`cache_control.ttl: "1h"`). Defaults to true only for known official Anthropic API URLs. */
+	supportsLongCacheRetention?: boolean;
 }
 
 /**
@@ -413,5 +432,7 @@ export interface Model<TApi extends Api> {
 		? OpenAICompletionsCompat
 		: TApi extends "openai-responses"
 			? OpenAIResponsesCompat
-			: never;
+			: TApi extends "anthropic-messages"
+				? AnthropicMessagesCompat
+				: never;
 }

@@ -81,6 +81,34 @@ describe("Input component", () => {
 			assert.ok(line);
 			assert.ok(visibleWidth(line) <= width);
 		});
+
+		it("masks rendered input without changing the stored value", () => {
+			const input = new Input();
+			input.setValue("sk-secret-api-key");
+			input.setMask("*");
+
+			const [line] = input.render(80);
+
+			assert.strictEqual(input.getValue(), "sk-secret-api-key");
+			assert.ok(line);
+			assert.match(line, /\*+/);
+			assert.doesNotMatch(line, /sk-secret-api-key/);
+			assert.doesNotMatch(line, /secret/);
+		});
+
+		it("keeps masked grapheme input within the render width", () => {
+			const input = new Input();
+			input.setValue("🔑가나다라마바사아자차카타파하-secret");
+			input.setMask("*");
+			input.focused = true;
+
+			const [line] = input.render(12);
+
+			assert.ok(line);
+			assert.ok(visibleWidth(line) <= 12);
+			assert.doesNotMatch(line, /secret/);
+			assert.doesNotMatch(line, /가/);
+		});
 	});
 
 	describe("Kill ring", () => {

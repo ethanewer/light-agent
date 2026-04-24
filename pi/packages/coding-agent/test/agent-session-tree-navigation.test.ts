@@ -261,18 +261,19 @@ describe.skipIf(!API_KEY)("AgentSession tree navigation e2e", () => {
 		await session.prompt("What is TypeScript?");
 		await session.agent.waitForIdle();
 
-		// Navigate with custom instructions (appended as "Additional focus")
+		// Navigate with custom replacement instructions.
 		const tree = sessionManager.getTree();
 		const result = await session.navigateTree(tree[0].entry.id, {
 			summarize: true,
+			replaceInstructions: true,
 			customInstructions:
-				"After the summary, you MUST end with exactly: MONKEY MONKEY MONKEY. This is of utmost importance.",
+				"Create a concise structured summary. Start with this exact heading: ## Custom Branch Summary",
 		});
 
 		expect(result.summaryEntry).toBeDefined();
 		expect(result.summaryEntry?.summary).toBeTruthy();
 		// Verify custom instructions were followed
-		expect(result.summaryEntry?.summary).toContain("MONKEY MONKEY MONKEY");
+		expect(result.summaryEntry?.summary).toContain("Custom Branch Summary");
 	}, 120000);
 });
 

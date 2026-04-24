@@ -853,6 +853,7 @@ interface OpenAICompletionsCompat {
   supportsUsageInStreaming?: boolean; // Whether provider supports `stream_options: { include_usage: true }` (default: true)
   supportsStrictMode?: boolean;      // Whether provider supports `strict` in tool definitions (default: true)
   sendSessionAffinityHeaders?: boolean; // Whether to send `session_id`, `x-client-request-id`, and `x-session-affinity` from `sessionId` when caching is enabled (default: false)
+  supportsLongCacheRetention?: boolean; // Whether provider supports long cache retention. Defaults true only for known official OpenAI/Anthropic API URLs.
   maxTokensField?: 'max_completion_tokens' | 'max_tokens';  // Which field name to use (default: max_completion_tokens)
   requiresToolResultName?: boolean;  // Whether tool results require the `name` field (default: false)
   requiresAssistantAfterToolResult?: boolean; // Whether tool results must be followed by an assistant message (default: false)
@@ -864,7 +865,8 @@ interface OpenAICompletionsCompat {
 }
 
 interface OpenAIResponsesCompat {
-  // Reserved for future use
+  sendSessionIdHeader?: boolean;      // Whether to send the `session_id` cache-affinity header (default: true)
+  supportsLongCacheRetention?: boolean; // Whether provider supports `prompt_cache_retention: "24h"`. Defaults true only for known official OpenAI API URLs.
 }
 ```
 
