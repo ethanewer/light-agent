@@ -91,6 +91,8 @@ export interface ExtensionUIDialogOptions {
 	signal?: AbortSignal;
 	/** Timeout in milliseconds. Dialog auto-dismisses with live countdown display. */
 	timeout?: number;
+	/** Mask text input contents with this character (useful for secrets). */
+	mask?: string;
 }
 
 /** Placement for extension widgets. */
@@ -104,6 +106,23 @@ export interface ExtensionWidgetOptions {
 
 /** Raw terminal input listener for extensions. */
 export type TerminalInputHandler = (data: string) => { consume?: boolean; data?: string } | undefined;
+
+/** Editor input event passed to extension editor input handlers in interactive mode. */
+export interface ExtensionEditorInputEvent {
+	/** Raw terminal input chunk before normal editor processing. */
+	data: string;
+	/** Currently active editor component. */
+	editor: EditorComponent;
+	/** App keybinding manager for matching configured keybindings. */
+	keybindings: KeybindingsManager;
+	/** Submit text through the editor's current submit path. */
+	submit(text: string): void;
+	/** Request a TUI rerender after state changes. */
+	requestRender(): void;
+}
+
+/** Editor input listener for extensions. Return true to consume the key. */
+export type EditorInputHandler = (event: ExtensionEditorInputEvent) => boolean | undefined;
 
 /** Working indicator configuration for the interactive streaming loader. */
 export interface WorkingIndicatorOptions {
@@ -135,6 +154,19 @@ export interface ExtensionUIContext {
 
 	/** Listen to raw terminal input (interactive mode only). Returns an unsubscribe function. */
 	onTerminalInput(handler: TerminalInputHandler): () => void;
+
+	/**
+	 * Listen to raw editor input before normal editor processing (interactive mode only).
+	 * Return true from the handler to consume the input.
+	 */
+	addEditorInputHandler(handler: EditorInputHandler): () => void;
+
+	/**
+	 * Set placeholder text rendered inside the empty editor. Providers are checked
+	 * in insertion order; the first non-undefined value is shown. Pass undefined
+	 * to clear a provider.
+	 */
+	setEditorPlaceholder(key: string, provider: (() => string | undefined) | undefined): void;
 
 	/** Set status text in the footer/status bar. Pass undefined to clear. */
 	setStatus(key: string, text: string | undefined): void;
@@ -429,6 +461,8 @@ export interface ToolDefinition<TParams extends TSchema = TSchema, TDetails = un
 	promptSnippet?: string;
 	/** Optional guideline bullets appended to the default system prompt Guidelines section when this tool is active. */
 	promptGuidelines?: string[];
+	/** Whether this tool should become active automatically when newly registered. Defaults to true for extension tools. */
+	defaultActive?: boolean;
 	/** Parameter schema (TypeBox) */
 	parameters: TParams;
 	/** Controls whether ToolExecutionComponent renders the standard colored shell or the tool renders its own framing. */

@@ -138,8 +138,11 @@ export async function runRpcMode(runtimeHost: AgentSessionRuntime): Promise<neve
 			),
 
 		input: (title, placeholder, opts) =>
-			createDialogPromise(opts, undefined, { method: "input", title, placeholder, timeout: opts?.timeout }, (r) =>
-				"cancelled" in r && r.cancelled ? undefined : "value" in r ? r.value : undefined,
+			createDialogPromise(
+				opts,
+				undefined,
+				{ method: "input", title, placeholder, timeout: opts?.timeout, mask: opts?.mask },
+				(r) => ("cancelled" in r && r.cancelled ? undefined : "value" in r ? r.value : undefined),
 			),
 
 		notify(message: string, type?: "info" | "warning" | "error"): void {
@@ -156,6 +159,15 @@ export async function runRpcMode(runtimeHost: AgentSessionRuntime): Promise<neve
 		onTerminalInput(): () => void {
 			// Raw terminal input not supported in RPC mode
 			return () => {};
+		},
+
+		addEditorInputHandler(): () => void {
+			// Raw editor input not supported in RPC mode
+			return () => {};
+		},
+
+		setEditorPlaceholder(): void {
+			// Editor placeholder rendering is host-controlled in RPC mode
 		},
 
 		setStatus(key: string, text: string | undefined): void {

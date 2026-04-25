@@ -26,7 +26,6 @@ import { Compile } from "typebox/compile";
 import type { TLocalizedValidationError } from "typebox/error";
 import { getAgentDir } from "../config.js";
 import type { AuthStatus, AuthStorage } from "./auth-storage.js";
-import { discoverLmStudioModels, LM_STUDIO_PROVIDER } from "./lmstudio-discovery.js";
 import {
 	clearConfigValueCache,
 	resolveConfigValueOrThrow,
@@ -237,8 +236,6 @@ interface CustomModelsResult {
 	models: Model<Api>[];
 	/** Providers with baseUrl/headers/apiKey overrides for built-in models */
 	overrides: Map<string, ProviderOverride>;
-	/** Provider overrides applied to auto-detected providers such as LM Studio */
-	autoDetectedOverrides: Map<string, ProviderOverride>;
 	/** Per-model overrides: provider -> modelId -> override */
 	modelOverrides: Map<string, Map<string, ModelOverride>>;
 	error: string | undefined;
@@ -248,7 +245,6 @@ function emptyCustomModelsResult(error?: string): CustomModelsResult {
 	return {
 		models: [],
 		overrides: new Map(),
-		autoDetectedOverrides: new Map(),
 		modelOverrides: new Map(),
 		error,
 	};
@@ -289,14 +285,6 @@ function mergeCompat(
  * Deep merge a model override into a model.
  * Handles nested objects (cost, compat) by merging rather than replacing.
  */
-function applyProviderOverride(model: Model<Api>, override: ProviderOverride): Model<Api> {
-	return {
-		...model,
-		baseUrl: override.baseUrl ?? model.baseUrl,
-		compat: mergeCompat(model.compat, override.compat),
-	};
-}
-
 function applyModelOverride(model: Model<Api>, override: ModelOverride): Model<Api> {
 	const result = { ...model };
 
@@ -334,9 +322,6 @@ export class ModelRegistry {
 	private providerRequestConfigs: Map<string, ProviderRequestConfig> = new Map();
 	private modelRequestHeaders: Map<string, Record<string, string>> = new Map();
 	private registeredProviders: Map<string, ProviderConfigInput> = new Map();
-	private autoDetectedProviders: Set<string> = new Set();
-	private autoDetectedProviderOverrides: Map<string, ProviderOverride> = new Map();
-	private autoDetectedProviderModelOverrides: Map<string, Map<string, ModelOverride>> = new Map();
 	private loadError: string | undefined = undefined;
 
 	private constructor(
@@ -358,15 +343,8 @@ export class ModelRegistry {
 	 * Reload models from disk (built-in + custom from models.json).
 	 */
 	refresh(): void {
-		const preservedAutoDetectedProviders = Array.from(this.autoDetectedProviders, (providerName) => ({
-			providerName,
-			models: this.models.filter((model) => model.provider === providerName),
-			requestConfig: this.providerRequestConfigs.get(providerName),
-		}));
-
 		this.providerRequestConfigs.clear();
 		this.modelRequestHeaders.clear();
-		this.autoDetectedProviders.clear();
 		this.loadError = undefined;
 
 		// Ensure dynamic API/OAuth registrations are rebuilt from current provider state.
@@ -378,66 +356,6 @@ export class ModelRegistry {
 		for (const [providerName, config] of this.registeredProviders.entries()) {
 			this.applyProviderConfig(providerName, config);
 		}
-
-		for (const preserved of preservedAutoDetectedProviders) {
-			const hasExplicitProviderConfig =
-				this.registeredProviders.has(preserved.providerName) ||
-				this.providerRequestConfigs.has(preserved.providerName) ||
-				this.models.some((model) => model.provider === preserved.providerName);
-			if (hasExplicitProviderConfig) {
-				continue;
-			}
-
-			if (preserved.requestConfig) {
-				this.storeProviderRequestConfig(preserved.providerName, preserved.requestConfig);
-			}
-			this.models.push(...preserved.models);
-			this.autoDetectedProviders.add(preserved.providerName);
-		}
-	}
-
-	async loadAutoDetectedProviders(options?: { force?: boolean }): Promise<void> {
-		this.removeAutoDetectedProvider(LM_STUDIO_PROVIDER);
-
-		const hasExplicitLmStudioConfig =
-			this.registeredProviders.has(LM_STUDIO_PROVIDER) ||
-			this.models.some((model) => model.provider === LM_STUDIO_PROVIDER);
-		if (hasExplicitLmStudioConfig) {
-			return;
-		}
-
-		const providerOverride = this.autoDetectedProviderOverrides.get(LM_STUDIO_PROVIDER);
-		const modelOverrides = this.autoDetectedProviderModelOverrides.get(LM_STUDIO_PROVIDER);
-		const lmStudioModels = (
-			await discoverLmStudioModels({
-				baseUrl: providerOverride?.baseUrl,
-				force: options?.force,
-			})
-		).map((model) => {
-			let nextModel = providerOverride ? applyProviderOverride(model, providerOverride) : model;
-			const modelOverride = modelOverrides?.get(model.id);
-			if (modelOverride) {
-				nextModel = applyModelOverride(nextModel, modelOverride);
-			}
-			return nextModel;
-		});
-		if (lmStudioModels.length === 0) {
-			return;
-		}
-
-		const requestConfig = this.providerRequestConfigs.get(LM_STUDIO_PROVIDER);
-		this.storeProviderRequestConfig(LM_STUDIO_PROVIDER, {
-			apiKey: requestConfig?.apiKey ?? LM_STUDIO_PROVIDER,
-			headers: requestConfig?.headers,
-			authHeader: requestConfig?.authHeader,
-		});
-		this.models.push(...lmStudioModels);
-		this.autoDetectedProviders.add(LM_STUDIO_PROVIDER);
-	}
-
-	async refreshAndLoadAutoDetectedProviders(options?: { force?: boolean }): Promise<void> {
-		this.refresh();
-		await this.loadAutoDetectedProviders(options);
 	}
 
 	/**
@@ -452,17 +370,9 @@ export class ModelRegistry {
 		const {
 			models: customModels,
 			overrides,
-			autoDetectedOverrides,
 			modelOverrides,
 			error,
 		} = this.modelsJsonPath ? this.loadCustomModels(this.modelsJsonPath) : emptyCustomModelsResult();
-
-		this.autoDetectedProviderOverrides = autoDetectedOverrides;
-		this.autoDetectedProviderModelOverrides = new Map();
-		const autoDetectedLmStudioModelOverrides = modelOverrides.get(LM_STUDIO_PROVIDER);
-		if (autoDetectedLmStudioModelOverrides) {
-			this.autoDetectedProviderModelOverrides.set(LM_STUDIO_PROVIDER, autoDetectedLmStudioModelOverrides);
-		}
 
 		if (error) {
 			this.loadError = error;
@@ -554,7 +464,6 @@ export class ModelRegistry {
 			this.validateConfig(config);
 
 			const overrides = new Map<string, ProviderOverride>();
-			const autoDetectedOverrides = new Map<string, ProviderOverride>();
 			const modelOverrides = new Map<string, Map<string, ModelOverride>>();
 			const builtInProviders = new Set<string>(getProviders());
 
@@ -566,9 +475,6 @@ export class ModelRegistry {
 					};
 					if (builtInProviders.has(providerName)) {
 						overrides.set(providerName, providerOverride);
-					}
-					if (providerName === LM_STUDIO_PROVIDER) {
-						autoDetectedOverrides.set(providerName, providerOverride);
 					}
 				}
 
@@ -585,7 +491,6 @@ export class ModelRegistry {
 			return {
 				models: this.parseModels(config),
 				overrides,
-				autoDetectedOverrides,
 				modelOverrides,
 				error: undefined,
 			};
@@ -736,16 +641,6 @@ export class ModelRegistry {
 
 	private getModelRequestKey(provider: string, modelId: string): string {
 		return `${provider}:${modelId}`;
-	}
-
-	private removeAutoDetectedProvider(providerName: string): void {
-		if (!this.autoDetectedProviders.has(providerName)) {
-			return;
-		}
-
-		this.models = this.models.filter((model) => model.provider !== providerName);
-		this.providerRequestConfigs.delete(providerName);
-		this.autoDetectedProviders.delete(providerName);
 	}
 
 	private storeProviderRequestConfig(

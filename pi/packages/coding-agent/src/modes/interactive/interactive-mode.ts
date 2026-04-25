@@ -61,6 +61,7 @@ import { type AgentSession, type AgentSessionEvent, parseSkillBlock } from "../.
 import { type AgentSessionRuntime, SessionImportFileNotFoundError } from "../../core/agent-session-runtime.js";
 import type {
 	AutocompleteProviderFactory,
+	EditorInputHandler,
 	ExtensionCommandContext,
 	ExtensionContext,
 	ExtensionRunner,
@@ -70,14 +71,8 @@ import type {
 } from "../../core/extensions/index.js";
 import { FooterDataProvider, type ReadonlyFooterDataProvider } from "../../core/footer-data-provider.js";
 import { type AppKeybinding, KeybindingsManager } from "../../core/keybindings.js";
-import { LM_STUDIO_PROVIDER } from "../../core/lmstudio-discovery.js";
 import { createCompactionSummaryMessage } from "../../core/messages.js";
-import {
-	defaultModelPerProvider,
-	findExactModelReferenceMatch,
-	patternReferencesProvider,
-	resolveModelScope,
-} from "../../core/model-resolver.js";
+import { defaultModelPerProvider, findExactModelReferenceMatch, resolveModelScope } from "../../core/model-resolver.js";
 import { DefaultPackageManager } from "../../core/package-manager.js";
 import type { ResourceDiagnostic } from "../../core/resource-loader.js";
 import { formatMissingSessionCwdPrompt, MissingSessionCwdError } from "../../core/session-cwd.js";
@@ -92,8 +87,6 @@ import { extensionForImageMimeType, readClipboardImage } from "../../utils/clipb
 import { parseGitUrl } from "../../utils/git.js";
 import { killTrackedDetachedChildren } from "../../utils/shell.js";
 import { ensureTool } from "../../utils/tools-manager.js";
-import { AGENT_MODES, type AgentMode, nextAgentMode } from "./agent-modes.js";
-import { VoiceController } from "./audio/voice-controller.js";
 import { ArminComponent } from "./components/armin.js";
 import { AssistantMessageComponent } from "./components/assistant-message.js";
 import { BashExecutionComponent } from "./components/bash-execution.js";
@@ -178,40 +171,6 @@ function isAnthropicSubscriptionAuthKey(apiKey: string | undefined): boolean {
 
 function isUnknownModel(model: Model<any> | undefined): boolean {
 	return !!model && model.provider === "unknown" && model.id === "unknown" && model.api === "unknown";
-}
-
-const VOICE_SPINNER_FRAMES = ["⠋", "⠙", "⠹", "⠸", "⠼", "⠴", "⠦", "⠧", "⠇", "⠏"];
-
-/**
- * Compose the voice-mode status text drawn as a placeholder inside the
- * editor. Uses the `accent` theme color for the idle indicator (calm teal
- * that matches pi branding) and `error` (muted red) for the active
- * recording light, the way physical recording LEDs look.
- */
-function buildVoiceStatusLine(controller: VoiceController, voiceModeEnabled: boolean): string {
-	if (controller.isTranscribing()) {
-		const dot = theme.bold(theme.fg("accent", "◉"));
-		return `${dot} ${theme.fg("dim", "Transcribing…")}`;
-	}
-	const key = (label: string) => theme.fg("muted", label);
-	const desc = (label: string) => theme.fg("dim", label);
-	const sep = theme.fg("dim", "·");
-	if (controller.isRecording()) {
-		const dot = theme.bold(theme.fg("error", "◉"));
-		const frame = VOICE_SPINNER_FRAMES[controller.getTick() % VOICE_SPINNER_FRAMES.length];
-		const elapsed = controller.getElapsedSeconds();
-		const min = String(Math.floor(elapsed / 60)).padStart(2, "0");
-		const sec = String(elapsed % 60).padStart(2, "0");
-		const active = theme.fg("error", `${frame} Rec ${min}:${sec}`);
-		const hint = `${key("space")} ${desc("send")} ${sep} ${key("shift+space")} ${desc("or")} ${key("type")} ${desc("to enter text input")}`;
-		return `${dot} ${active}  ${hint}`;
-	}
-	if (voiceModeEnabled) {
-		const dot = theme.bold(theme.fg("accent", "◉"));
-		const hint = `${key("space")} ${desc("record")} ${sep} ${key("shift+space")} ${desc("or")} ${key("type")} ${desc("to enter text input")}`;
-		return `${dot} ${hint}`;
-	}
-	return "";
 }
 
 function hasDefaultModelProvider(providerId: string): providerId is keyof typeof defaultModelPerProvider {
@@ -369,6 +328,8 @@ export class InteractiveMode {
 	private extensionInput: ExtensionInputComponent | undefined = undefined;
 	private extensionEditor: ExtensionEditorComponent | undefined = undefined;
 	private extensionTerminalInputUnsubscribers = new Set<() => void>();
+	private extensionEditorInputHandlers: EditorInputHandler[] = [];
+	private extensionEditorPlaceholderProviders = new Map<string, () => string | undefined>();
 
 	// Extension widgets (components rendered above/below the editor)
 	private extensionWidgetsAbove = new Map<string, Component & { dispose?(): void }>();
@@ -381,28 +342,6 @@ export class InteractiveMode {
 
 	// Header container that holds the built-in or custom header
 	private headerContainer: Container;
-
-	// Voice (audio) input support. Space toggles recording in voice mode;
-	// ctrl+space toggles into text-input mode (transcribing any in-flight
-	// recording into the editor without sending).
-	private voiceController: VoiceController | undefined;
-	private voiceModeEnabled = true;
-	// Editor to route transcription results into. Captured when a stop/finish
-	// is initiated so that async transcription can't race with subsequent
-	// editor swaps (selectors, extension-installed custom editors, etc.).
-	private voiceTargetEditor: EditorComponent | undefined;
-	// Submit hook state. While transcription is in flight we replace the
-	// target editor's onSubmit with a buffer so the user can type AND press
-	// enter during the latency window without losing either the typed text
-	// or the transcript.
-	private voiceOriginalOnSubmit?: EditorComponent["onSubmit"];
-	private voicePendingSubmit?: string;
-
-	// Agent-mode cycling (Tab on an empty editor). `defaultToolNames` is
-	// captured lazily on first switch so it reflects whatever the session
-	// was built with.
-	private currentAgentModeName: string = AGENT_MODES[0]?.name ?? "general";
-	private defaultAgentToolNames: string[] | undefined;
 
 	// Built-in header (logo + keybinding hints + changelog)
 	private builtInHeader: Component | undefined = undefined;
@@ -723,7 +662,6 @@ export class InteractiveMode {
 		this.ui.addChild(this.editorContainer);
 		this.ui.addChild(this.widgetContainerBelow);
 
-		this.initVoiceInput();
 		this.ui.addChild(this.footer);
 		this.ui.setFocus(this.editor);
 
@@ -1408,10 +1346,13 @@ export class InteractiveMode {
 		const themesResult = this.session.resourceLoader.getThemes();
 		const extensions =
 			options?.extensions ??
-			this.session.resourceLoader.getExtensions().extensions.map((extension) => ({
-				path: extension.path,
-				sourceInfo: extension.sourceInfo,
-			}));
+			this.session.resourceLoader
+				.getExtensions()
+				.extensions.filter((extension) => !extension.path.startsWith("<builtin:"))
+				.map((extension) => ({
+					path: extension.path,
+					sourceInfo: extension.sourceInfo,
+				}));
 		const sourceInfos = new Map<string, SourceInfo>();
 		for (const extension of extensions) {
 			if (extension.sourceInfo) {
@@ -1688,7 +1629,6 @@ export class InteractiveMode {
 	}
 
 	private renderCurrentSessionState(): void {
-		this.resetAgentModeState();
 		this.chatContainer.clear();
 		this.pendingMessagesContainer.clear();
 		this.compactionQueuedMessages = [];
@@ -1871,6 +1811,8 @@ export class InteractiveMode {
 		}
 		this.ui.hideOverlay();
 		this.clearExtensionTerminalInputListeners();
+		this.clearExtensionEditorInputHandlers();
+		this.extensionEditorPlaceholderProviders.clear();
 		this.setExtensionFooter(undefined);
 		this.setExtensionHeader(undefined);
 		this.clearExtensionWidgets();
@@ -2020,6 +1962,58 @@ export class InteractiveMode {
 		this.extensionTerminalInputUnsubscribers.clear();
 	}
 
+	private addExtensionEditorInputHandler(handler: EditorInputHandler): () => void {
+		this.extensionEditorInputHandlers.push(handler);
+		return () => {
+			const index = this.extensionEditorInputHandlers.indexOf(handler);
+			if (index >= 0) this.extensionEditorInputHandlers.splice(index, 1);
+		};
+	}
+
+	private clearExtensionEditorInputHandlers(): void {
+		this.extensionEditorInputHandlers = [];
+	}
+
+	private handleExtensionEditorInput(data: string): boolean {
+		if (this.extensionEditorInputHandlers.length === 0) return false;
+		const editor = this.editor;
+		const submit = editor.onSubmit ?? this.defaultEditor.onSubmit;
+		for (const handler of [...this.extensionEditorInputHandlers]) {
+			try {
+				const result = handler({
+					data,
+					editor,
+					keybindings: this.keybindings,
+					submit: (text) => submit?.(text),
+					requestRender: () => this.ui.requestRender(),
+				});
+				if (result === true) return true;
+			} catch (error) {
+				this.showError(
+					`Extension editor input handler failed: ${error instanceof Error ? error.message : String(error)}`,
+				);
+			}
+		}
+		return false;
+	}
+
+	private setExtensionEditorPlaceholder(key: string, provider: (() => string | undefined) | undefined): void {
+		if (provider) {
+			this.extensionEditorPlaceholderProviders.set(key, provider);
+		} else {
+			this.extensionEditorPlaceholderProviders.delete(key);
+		}
+		this.ui.requestRender();
+	}
+
+	private getExtensionEditorPlaceholder(): string | undefined {
+		for (const provider of this.extensionEditorPlaceholderProviders.values()) {
+			const value = provider();
+			if (value !== undefined) return value;
+		}
+		return undefined;
+	}
+
 	/**
 	 * Create the ExtensionUIContext for extensions.
 	 */
@@ -2030,6 +2024,8 @@ export class InteractiveMode {
 			input: (title, placeholder, opts) => this.showExtensionInput(title, placeholder, opts),
 			notify: (message, type) => this.showExtensionNotify(message, type),
 			onTerminalInput: (handler) => this.addExtensionTerminalInputListener(handler),
+			addEditorInputHandler: (handler) => this.addExtensionEditorInputHandler(handler),
+			setEditorPlaceholder: (key, provider) => this.setExtensionEditorPlaceholder(key, provider),
 			setStatus: (key, text) => this.setExtensionStatus(key, text),
 			setWorkingMessage: (message) => {
 				this.workingMessage = message;
@@ -2192,7 +2188,7 @@ export class InteractiveMode {
 					this.hideExtensionInput();
 					resolve(undefined);
 				},
-				{ tui: this.ui, timeout: opts?.timeout },
+				{ tui: this.ui, timeout: opts?.timeout, mask: opts?.mask },
 			);
 
 			this.editorContainer.clear();
@@ -2304,13 +2300,11 @@ export class InteractiveMode {
 				if (!customEditor.onExtensionShortcut) {
 					customEditor.onExtensionShortcut = (data: string) => this.defaultEditor.onExtensionShortcut?.(data);
 				}
-				// Forward voice-mode hooks so space/shift+space and the recording
-				// indicator keep working after an extension swaps the editor.
-				if (!customEditor.onVoiceInput) {
-					customEditor.onVoiceInput = this.defaultEditor.onVoiceInput;
-				}
 				if (!customEditor.placeholderLine) {
 					customEditor.placeholderLine = this.defaultEditor.placeholderLine;
+				}
+				if (!customEditor.onEditorInput) {
+					customEditor.onEditorInput = this.defaultEditor.onEditorInput;
 				}
 				// Forward the agent-mode tab hook so cycling keeps working when
 				// an extension swaps in a custom editor.
@@ -2517,53 +2511,8 @@ export class InteractiveMode {
 			this.handleClipboardImagePaste();
 		};
 
-		// Tab on empty editor cycles agent modes (general / chat / …).
-		this.defaultEditor.onTab = () => this.handleAgentModeTab();
-	}
-
-	/**
-	 * Cycle the active agent mode when Tab is pressed on an empty editor.
-	 * Returns true to consume the key; false lets normal tab handling run.
-	 */
-	private handleAgentModeTab(): boolean {
-		// Don't interfere mid-recording / mid-transcription.
-		const vc = this.voiceController;
-		if (vc && (vc.isRecording() || vc.isTranscribing())) {
-			return false;
-		}
-		if (AGENT_MODES.length < 2) return false;
-
-		// Capture the session's current tool set the first time we switch so we
-		// can restore it when cycling back to a mode with `tools: null`. Lazy
-		// capture is fine: the "general" mode is defined as "whatever the
-		// session is currently configured with", so snapshotting at first switch
-		// preserves any earlier extension / user tool tweaks.
-		if (this.defaultAgentToolNames === undefined) {
-			this.defaultAgentToolNames = this.session.getActiveToolNames();
-		}
-
-		const mode = nextAgentMode(this.currentAgentModeName);
-		this.applyAgentMode(mode);
-		return true;
-	}
-
-	private resetAgentModeState(): void {
-		this.currentAgentModeName = AGENT_MODES[0]?.name ?? "general";
-		this.defaultAgentToolNames = undefined;
-	}
-
-	private applyAgentMode(mode: AgentMode): void {
-		const toolNames = mode.tools === null ? (this.defaultAgentToolNames ?? []) : [...mode.tools];
-		// setActiveToolsByName rebuilds the default system prompt; apply or clear
-		// the mode-specific override after that rebuild.
-		this.session.setActiveToolsByName(toolNames);
-		if (mode.systemPrompt !== null) {
-			this.session.setSystemPrompt(mode.systemPrompt);
-		} else {
-			this.session.clearSystemPromptOverride();
-		}
-		this.currentAgentModeName = mode.name;
-		this.showStatus(`Switched to ${mode.name} mode`);
+		this.defaultEditor.onEditorInput = (data) => this.handleExtensionEditorInput(data);
+		this.defaultEditor.placeholderLine = () => this.getExtensionEditorPlaceholder();
 	}
 
 	private async handleClipboardImagePaste(): Promise<void> {
@@ -2714,11 +2663,6 @@ export class InteractiveMode {
 			if (text === "/quit") {
 				this.editor.setText("");
 				await this.shutdown();
-				return;
-			}
-			if (text === "/voice") {
-				this.editor.setText("");
-				this.enterVoiceMode();
 				return;
 			}
 
@@ -3368,8 +3312,6 @@ export class InteractiveMode {
 		if (this.isShuttingDown) return;
 		this.isShuttingDown = true;
 		this.unregisterSignalHandlers();
-		this.voiceController?.dispose();
-		this.voiceController = undefined;
 
 		// Drain any in-flight Kitty key release events before stopping.
 		// This prevents escape sequences from leaking to the parent shell over slow SSH.
@@ -3612,268 +3554,6 @@ export class InteractiveMode {
 			// Force full re-render since external editor uses alternate screen
 			this.ui.requestRender(true);
 		}
-	}
-
-	// =========================================================================
-	// Voice input
-	// =========================================================================
-
-	private initVoiceInput(): void {
-		if (this.voiceController) return;
-
-		this.voiceController = new VoiceController({
-			getApiKey: () => this.session.modelRegistry.getApiKeyForProvider("openai"),
-			getBaseUrl: () => this.getOpenAIBaseUrl(),
-			onResult: (text) => this.handleVoiceResult(text),
-			onFinish: (text) => this.handleVoiceFinish(text),
-			onTranscriptionEnd: () => this.finalizeVoiceSession(),
-			onStateChange: () => this.ui.requestRender(),
-			onError: (message) => this.showError(message),
-		});
-
-		this.defaultEditor.onVoiceInput = (data, keyInfo) => this.handleVoiceKey(data, keyInfo);
-		this.defaultEditor.placeholderLine = () => this.getVoicePlaceholder();
-		this.ui.requestRender();
-	}
-
-	/**
-	 * Resolve the configured OpenAI base URL so installations that route
-	 * the `openai` provider through a proxy (corporate gateway, Azure
-	 * OpenAI, OpenRouter alias, etc.) transcribe against the same endpoint
-	 * as chat requests. Falls back to the SDK default when no override is
-	 * configured.
-	 */
-	private getOpenAIBaseUrl(): string | undefined {
-		try {
-			const models = this.session.modelRegistry.getAvailable();
-			const openaiModel = models.find((m) => m.provider === "openai");
-			return openaiModel?.baseUrl || undefined;
-		} catch {
-			return undefined;
-		}
-	}
-
-	private getVoicePlaceholder(): string | undefined {
-		const controller = this.voiceController;
-		if (!controller) return undefined;
-		if (!this.voiceModeEnabled && !controller.isRecording() && !controller.isTranscribing()) {
-			return undefined;
-		}
-		return buildVoiceStatusLine(controller, this.voiceModeEnabled);
-	}
-
-	private enterVoiceMode(): void {
-		if (this.voiceModeEnabled) return;
-		this.voiceModeEnabled = true;
-		this.ui.requestRender();
-	}
-
-	private exitVoiceMode(): void {
-		if (!this.voiceModeEnabled) return;
-		this.voiceModeEnabled = false;
-		this.ui.requestRender();
-	}
-
-	/**
-	 * Handle a raw key event while voice mode may be active. Returns true when
-	 * the key was consumed and should not reach the editor. Mirrors the
-	 * opencode-audio prompt logic (space/ctrl+space + exit-on-typing). We
-	 * also treat Shift+Space as an alias for Ctrl+Space because macOS binds
-	 * Ctrl+Space to "switch input source" by default, and the Shift+Space
-	 * combination is reliably delivered to the terminal.
-	 */
-	private handleVoiceKey(
-		_data: string,
-		keyInfo: { isSpace: boolean; isCtrlSpace: boolean; isShiftSpace: boolean },
-	): boolean {
-		const controller = this.voiceController;
-		if (!controller) return false;
-
-		const isModSpace = keyInfo.isCtrlSpace || keyInfo.isShiftSpace;
-
-		// Voice mode toggle (text-mode -> voice-mode) via ctrl/shift+space when not recording.
-		if (!this.voiceModeEnabled) {
-			if (isModSpace && !controller.isRecording() && !controller.isTranscribing()) {
-				// Only toggle back when the editor is empty so we don't surprise a user mid-type.
-				if (!this.editor.getText()) {
-					this.enterVoiceMode();
-					return true;
-				}
-			}
-			return false;
-		}
-
-		// In voice mode.
-		if (controller.isTranscribing()) {
-			// While transcription is pending, eat space/ctrl+space/shift+space to
-			// avoid re-triggering the voice flow. Everything else (ctrl+d,
-			// ctrl+c, escape, arrows, typing…) is allowed through so the rest of
-			// the app keeps behaving normally.
-			if (keyInfo.isSpace || isModSpace) return true;
-			return false;
-		}
-
-		if (isModSpace) {
-			if (controller.isRecording()) {
-				// Start transcription but flip to text mode *immediately* so the
-				// user can keep typing while the transcription resolves. The
-				// transcript will be prepended in front of anything they type via
-				// handleVoiceFinish.
-				this.beginVoiceSession();
-				controller.finish();
-				this.exitVoiceMode();
-			} else {
-				this.exitVoiceMode();
-			}
-			return true;
-		}
-
-		if (keyInfo.isSpace) {
-			if (controller.isRecording()) {
-				// Pressing space while recording triggers send: capture the
-				// target editor *now* so the async result lands where the user
-				// initiated the voice action.
-				this.beginVoiceSession();
-			}
-			controller.toggle();
-			return true;
-		}
-
-		// Any non-voice key behaves exactly like pressing shift+space first,
-		// then the key itself: finish the in-flight recording (transcribe +
-		// prepend into the editor) and exit voice mode, then let the key
-		// continue on to the editor / app-keybinding handlers so that ctrl+d
-		// (exit), ctrl+c (clear), escape, arrows, typed characters, etc. all
-		// keep working normally.
-		if (controller.isRecording()) {
-			this.beginVoiceSession();
-			controller.finish();
-		}
-		this.exitVoiceMode();
-		return false;
-	}
-
-	/**
-	 * Capture the active editor as the transcription target and install a
-	 * submit interceptor on it. While transcription is pending, any submit
-	 * (enter key, programmatic) is buffered into `voicePendingSubmit`
-	 * instead of being dispatched immediately. When the transcript arrives
-	 * we combine it with the buffered text and dispatch through the editor's
-	 * original onSubmit so nothing the user typed or submitted is lost.
-	 */
-	private beginVoiceSession(): void {
-		const target = this.editor;
-		this.voiceTargetEditor = target;
-		this.voicePendingSubmit = undefined;
-		this.voiceOriginalOnSubmit = target.onSubmit;
-		target.onSubmit = (text: string) => {
-			this.voicePendingSubmit = text;
-		};
-	}
-
-	/**
-	 * Always called when a transcription attempt ends (success, empty,
-	 * error, or cancelled). Drops the captured target editor and restores
-	 * its original onSubmit so the next recording starts clean.
-	 */
-	private finalizeVoiceSession(): void {
-		const target = this.voiceTargetEditor;
-		if (target && this.voiceOriginalOnSubmit !== undefined) {
-			target.onSubmit = this.voiceOriginalOnSubmit;
-		}
-		this.voiceOriginalOnSubmit = undefined;
-		this.voiceTargetEditor = undefined;
-		// Any submit the user attempted during transcription that wasn't
-		// already consumed by handleVoiceResult/handleVoiceFinish is
-		// flushed here so their typed text still reaches the session.
-		const pending = this.voicePendingSubmit;
-		this.voicePendingSubmit = undefined;
-		if (pending !== undefined) {
-			const submit = target?.onSubmit ?? this.defaultEditor.onSubmit;
-			if (submit && pending.trim()) submit(pending);
-		}
-	}
-
-	/**
-	 * Resolve the editor that should receive the transcript. Prefers the
-	 * editor captured when the voice session began (so an editor swap mid
-	 * transcription doesn't misroute the result), falling back to the
-	 * currently focused editor.
-	 */
-	private getVoiceTargetEditor(): EditorComponent {
-		return this.voiceTargetEditor ?? this.editor;
-	}
-
-	private handleVoiceResult(text: string): void {
-		const trimmed = text.trim();
-		if (!trimmed) return;
-
-		// Always dispatch through the *original* onSubmit — `target.onSubmit`
-		// is still the buffering interceptor installed by beginVoiceSession();
-		// it will be restored in finalizeVoiceSession() right after this.
-		const submit = this.voiceOriginalOnSubmit ?? this.defaultEditor.onSubmit;
-		if (!submit) return;
-
-		// If the user also typed + pressed enter during transcription, the
-		// text is buffered in voicePendingSubmit. Combine it with the
-		// transcript so nothing is dropped. The in-flight editor's text is
-		// already cleared (onSubmit was called on it), so we don't touch it.
-		const pending = this.voicePendingSubmit;
-		this.voicePendingSubmit = undefined;
-		const combined = pending?.trim() ? `${trimmed} ${pending}` : trimmed;
-		submit(combined);
-	}
-
-	private handleVoiceFinish(text: string): void {
-		const target = this.getVoiceTargetEditor();
-		this.exitVoiceMode();
-		const trimmed = text.trim();
-
-		// If the user typed + pressed enter during transcription, the editor
-		// was cleared by submitValue and the attempted submit is sitting in
-		// voicePendingSubmit. Combine the transcript with that text and
-		// dispatch the *original* onSubmit so the message gets sent with
-		// everything the user intended.
-		const pending = this.voicePendingSubmit;
-		if (pending !== undefined) {
-			this.voicePendingSubmit = undefined;
-			const submit = this.voiceOriginalOnSubmit ?? this.defaultEditor.onSubmit;
-			if (submit) {
-				const sep = pending.startsWith(" ") || pending.startsWith("\n") || !pending ? "" : " ";
-				const combined = trimmed ? `${trimmed}${sep}${pending}` : pending;
-				if (combined.trim()) submit(combined);
-			}
-			this.ui.requestRender();
-			return;
-		}
-
-		if (!trimmed) {
-			this.ui.requestRender();
-			return;
-		}
-
-		const current = target.getText();
-		if (!current) {
-			// Empty editor: just set the text. Cursor naturally lands at the end,
-			// which is exactly what the user wants.
-			target.setText(trimmed);
-			this.ui.requestRender();
-			return;
-		}
-
-		// User typed something while transcription was in flight. Prepend the
-		// transcript in front of their text, separated by a space if needed, and
-		// keep the cursor anchored on their content so they can keep typing.
-		const sep = current.startsWith(" ") || current.startsWith("\n") ? "" : " ";
-		const prefix = `${trimmed}${sep}`;
-		if (target.prependText) {
-			target.prependText(prefix);
-		} else {
-			// Fallback for custom editors without prependText: best-effort using
-			// setText (cursor jumps to the end).
-			target.setText(prefix + current);
-		}
-		this.ui.requestRender();
 	}
 
 	// =========================================================================
@@ -4321,28 +4001,13 @@ export class InteractiveMode {
 		return findExactModelReferenceMatch(searchTerm, models);
 	}
 
-	private shouldLoadLmStudioModels(searchPattern?: string): boolean {
-		return (
-			this.session.model?.provider === LM_STUDIO_PROVIDER ||
-			this.settingsManager.getDefaultProvider() === LM_STUDIO_PROVIDER ||
-			this.session.scopedModels.some((scoped) => scoped.model.provider === LM_STUDIO_PROVIDER) ||
-			this.settingsManager
-				.getEnabledModels()
-				?.some((pattern) => patternReferencesProvider(pattern, LM_STUDIO_PROVIDER)) === true ||
-			patternReferencesProvider(searchPattern, LM_STUDIO_PROVIDER)
-		);
-	}
-
-	private async getModelCandidates(searchPattern?: string): Promise<Model<any>[]> {
+	private async getModelCandidates(_searchPattern?: string): Promise<Model<any>[]> {
 		if (this.session.scopedModels.length > 0) {
 			return this.session.scopedModels.map((scoped) => scoped.model);
 		}
 
 		try {
 			this.session.modelRegistry.refresh();
-			if (this.shouldLoadLmStudioModels(searchPattern)) {
-				await this.session.modelRegistry.loadAutoDetectedProviders();
-			}
 			return this.session.modelRegistry.getAvailable();
 		} catch {
 			return [];
@@ -4420,9 +4085,6 @@ export class InteractiveMode {
 	private async showModelsSelector(): Promise<void> {
 		// Get all available models
 		this.session.modelRegistry.refresh();
-		if (this.shouldLoadLmStudioModels()) {
-			await this.session.modelRegistry.loadAutoDetectedProviders({ force: true });
-		}
 		const allModels = this.session.modelRegistry.getAvailable();
 
 		if (allModels.length === 0) {

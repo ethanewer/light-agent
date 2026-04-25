@@ -3,6 +3,7 @@ import { homedir } from "node:os";
 import { join, resolve, sep } from "node:path";
 import chalk from "chalk";
 import { CONFIG_DIR_NAME } from "../config.js";
+import lightAgentDefaults from "../default-extensions/light-agent/index.js";
 import { loadThemeFromPath, type Theme } from "../modes/interactive/theme/theme.js";
 import type { ResourceDiagnostic } from "./diagnostics.js";
 
@@ -218,7 +219,7 @@ export class DefaultResourceLoader implements ResourceLoader {
 		this.additionalSkillPaths = options.additionalSkillPaths ?? [];
 		this.additionalPromptTemplatePaths = options.additionalPromptTemplatePaths ?? [];
 		this.additionalThemePaths = options.additionalThemePaths ?? [];
-		this.extensionFactories = options.extensionFactories ?? [];
+		this.extensionFactories = [lightAgentDefaults, ...(options.extensionFactories ?? [])];
 		this.noExtensions = options.noExtensions ?? false;
 		this.noSkills = options.noSkills ?? false;
 		this.noPromptTemplates = options.noPromptTemplates ?? false;
@@ -774,7 +775,7 @@ export class DefaultResourceLoader implements ResourceLoader {
 		const errors: Array<{ path: string; error: string }> = [];
 
 		for (const [index, factory] of this.extensionFactories.entries()) {
-			const extensionPath = `<inline:${index + 1}>`;
+			const extensionPath = factory === lightAgentDefaults ? "<builtin:light-agent>" : `<inline:${index}>`;
 			try {
 				const extension = await loadExtensionFromFactory(factory, this.cwd, this.eventBus, runtime, extensionPath);
 				extensions.push(extension);

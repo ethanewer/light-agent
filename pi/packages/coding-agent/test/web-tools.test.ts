@@ -1,10 +1,6 @@
 import { describe, expect, it, vi } from "vitest";
-import { createWebFetchTool } from "../src/core/tools/webfetch.js";
-import { createWebSearchTool } from "../src/core/tools/websearch.js";
-import {
-	createWebFetchToolDefinition as createRootWebFetchToolDefinition,
-	createWebSearchToolDefinition as createRootWebSearchToolDefinition,
-} from "../src/index.js";
+import { createWebFetchTool } from "../src/default-extensions/light-agent/web-tools/webfetch.js";
+import { createWebSearchTool } from "../src/default-extensions/light-agent/web-tools/websearch.js";
 
 function getTextOutput(result: any): string {
 	return (
@@ -241,12 +237,5 @@ describe("websearch tool", () => {
 		const tool = createWebSearchTool();
 		const year = new Date().getFullYear().toString();
 		expect(tool.description).toContain(year);
-	});
-});
-
-describe("web tool package exports", () => {
-	it("exports web tool definitions from the package root", () => {
-		expect(createRootWebFetchToolDefinition().name).toBe("webfetch");
-		expect(createRootWebSearchToolDefinition().name).toBe("websearch");
 	});
 });

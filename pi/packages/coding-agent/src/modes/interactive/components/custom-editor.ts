@@ -2,7 +2,6 @@ import {
 	Editor,
 	type EditorOptions,
 	type EditorTheme,
-	matchesKey,
 	type TUI,
 	truncateToWidth,
 	visibleWidth,
@@ -22,18 +21,11 @@ export class CustomEditor extends Editor {
 	public onPasteImage?: () => void;
 	/** Handler for extension-registered shortcuts. Returns true if handled. */
 	public onExtensionShortcut?: (data: string) => boolean;
-	/**
-	 * Voice input mode hook. Invoked with every raw input chunk *before* any
-	 * other handling. Returning `true` means the key was consumed and no
-	 * further editor processing should happen.
-	 */
-	public onVoiceInput?: (
-		data: string,
-		keyInfo: { isSpace: boolean; isCtrlSpace: boolean; isShiftSpace: boolean },
-	) => boolean;
+	/** Generic extension editor input hook. Return true to consume the key. */
+	public onEditorInput?: (data: string) => boolean;
 	/**
 	 * Provider for placeholder text rendered inside the editor's content area
-	 * when the editor is empty. Used for the voice-recording indicator.
+	 * when the editor is empty. Used by extension-provided editor modes.
 	 * Returning `undefined` falls back to the normal empty-editor rendering
 	 * (blinking cursor).
 	 */
@@ -90,11 +82,9 @@ export class CustomEditor extends Editor {
 	}
 
 	handleInput(data: string): void {
-		// Empty-editor Tab hook runs before the voice hook so tab in the
-		// "voice idle" state (before recording) can be intercepted without
-		// first dropping out of voice mode. Only fires when the buffer is
-		// empty and autocomplete isn't active, so normal tab completion and
-		// literal-tab insertion are untouched.
+		// Empty-editor Tab hook runs before generic extension editor input hooks.
+		// Only fires when the buffer is empty and autocomplete isn't active, so
+		// normal tab completion and literal-tab insertion are untouched.
 		if (
 			this.onTab &&
 			this.keybindings.matches(data, "tui.input.tab") &&
@@ -104,16 +94,9 @@ export class CustomEditor extends Editor {
 			if (this.onTab()) return;
 		}
 
-		// Voice-mode hook runs before any other input handling so it can
-		// intercept space / ctrl+space / shift+space (and exit voice mode on
-		// other keys) without conflicting with registered app actions.
-		if (this.onVoiceInput) {
-			const isSpace = matchesKey(data, "space");
-			const isCtrlSpace = matchesKey(data, "ctrl+space");
-			const isShiftSpace = matchesKey(data, "shift+space");
-			if (this.onVoiceInput(data, { isSpace, isCtrlSpace, isShiftSpace })) {
-				return;
-			}
+		// Generic extension editor input hooks run before shortcuts and normal editing.
+		if (this.onEditorInput?.(data)) {
+			return;
 		}
 
 		// Check extension-registered shortcuts first

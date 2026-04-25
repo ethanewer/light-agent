@@ -47,6 +47,7 @@ export type {
 	ContextUsage,
 	CustomToolCallEvent,
 	CustomToolResultEvent,
+	EditorInputHandler,
 	EditToolCallEvent,
 	EditToolResultEvent,
 	ExecOptions,
@@ -59,6 +60,7 @@ export type {
 	ExtensionCommandContextActions,
 	ExtensionContext,
 	ExtensionContextActions,
+	ExtensionEditorInputEvent,
 	// Errors
 	ExtensionError,
 	ExtensionEvent,

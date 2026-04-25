@@ -220,6 +220,7 @@ export type RpcExtensionUIRequest =
 			title: string;
 			placeholder?: string;
 			timeout?: number;
+			mask?: string;
 	  }
 	| { type: "extension_ui_request"; id: string; method: "editor"; title: string; prefill?: string }
 	| {

@@ -9,9 +9,10 @@ import {
 	Text,
 	type TUI,
 } from "@mariozechner/pi-tui";
-import { LM_STUDIO_PROVIDER } from "../../../core/lmstudio-discovery.js";
+
+const LM_STUDIO_PROVIDER = "lmstudio";
+
 import type { ModelRegistry } from "../../../core/model-registry.js";
-import { patternReferencesProvider } from "../../../core/model-resolver.js";
 import type { SettingsManager } from "../../../core/settings-manager.js";
 import { theme } from "../theme/theme.js";
 import { DynamicBorder } from "./dynamic-border.js";
@@ -62,8 +63,6 @@ export class ModelSelectorComponent extends Container implements Focusable {
 	private scope: ModelScope = "all";
 	private scopeText?: Text;
 	private scopeHintText?: Text;
-	private lmStudioModelsLoaded = false;
-	private lmStudioLoadPromise?: Promise<void>;
 
 	constructor(
 		tui: TUI,
@@ -143,10 +142,7 @@ export class ModelSelectorComponent extends Container implements Focusable {
 
 		// Refresh models and only auto-load LM Studio when the current session state or
 		// search input indicates the user is actually working with LM Studio.
-		this.loadModels({
-			force: !!initialSearchInput,
-			includeAutoDetectedProviders: this.shouldLoadLmStudioModels(initialSearchInput),
-		}).then(() => {
+		this.loadModels().then(() => {
 			if (initialSearchInput) {
 				this.filterModels(initialSearchInput);
 			} else {
@@ -156,21 +152,8 @@ export class ModelSelectorComponent extends Container implements Focusable {
 		});
 	}
 
-	private shouldLoadLmStudioModels(searchPattern?: string): boolean {
-		return (
-			this.currentModel?.provider === LM_STUDIO_PROVIDER ||
-			this.settingsManager.getDefaultProvider() === LM_STUDIO_PROVIDER ||
-			this.settingsManager
-				.getEnabledModels()
-				?.some((pattern) => patternReferencesProvider(pattern, LM_STUDIO_PROVIDER)) === true ||
-			this.scopedModels.some((scoped) => scoped.model.provider === LM_STUDIO_PROVIDER) ||
-			patternReferencesProvider(searchPattern, LM_STUDIO_PROVIDER)
-		);
-	}
-
 	private applyLoadedModels(models: ModelItem[]): void {
 		this.allModels = this.sortModels(models);
-		this.lmStudioModelsLoaded = this.allModels.some((item) => item.provider === LM_STUDIO_PROVIDER);
 		this.scopedModels = this.scopedModels.map((scoped) => {
 			const refreshed = this.modelRegistry.find(scoped.model.provider, scoped.model.id);
 			return refreshed ? { ...scoped, model: refreshed } : scoped;
@@ -187,13 +170,10 @@ export class ModelSelectorComponent extends Container implements Focusable {
 			currentIndex >= 0 ? currentIndex : Math.min(this.selectedIndex, Math.max(0, this.filteredModels.length - 1));
 	}
 
-	private async loadModels(options?: { force?: boolean; includeAutoDetectedProviders?: boolean }): Promise<void> {
+	private async loadModels(): Promise<void> {
 		let models: ModelItem[];
 
 		this.modelRegistry.refresh();
-		if (options?.includeAutoDetectedProviders) {
-			await this.modelRegistry.loadAutoDetectedProviders({ force: options.force });
-		}
 
 		const loadError = this.modelRegistry.getError();
 		this.errorMessage = loadError;
@@ -215,24 +195,6 @@ export class ModelSelectorComponent extends Container implements Focusable {
 		}
 
 		this.applyLoadedModels(models);
-	}
-
-	private maybeLoadLmStudioModels(query: string): void {
-		if (this.lmStudioModelsLoaded || !patternReferencesProvider(query, LM_STUDIO_PROVIDER)) {
-			return;
-		}
-		if (this.lmStudioLoadPromise) {
-			return;
-		}
-
-		this.lmStudioLoadPromise = this.loadModels({ force: true, includeAutoDetectedProviders: true })
-			.then(() => {
-				this.filterModels(this.searchInput.getValue(), false);
-				this.tui.requestRender();
-			})
-			.finally(() => {
-				this.lmStudioLoadPromise = undefined;
-			});
 	}
 
 	private sortModels(models: ModelItem[]): ModelItem[] {
@@ -283,10 +245,7 @@ export class ModelSelectorComponent extends Container implements Focusable {
 		}
 	}
 
-	private filterModels(query: string, allowLmStudioLoad = true): void {
-		if (allowLmStudioLoad) {
-			this.maybeLoadLmStudioModels(query);
-		}
+	private filterModels(query: string, _allowLmStudioLoad = true): void {
 		this.filteredModels = query
 			? fuzzyFilter(this.activeModels, query, (item) => this.getSearchText(item))
 			: this.activeModels;

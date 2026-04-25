@@ -194,14 +194,17 @@ Project skill`,
 			await loader.reload();
 
 			const extensionsResult = loader.getExtensions();
-			expect(extensionsResult.extensions).toHaveLength(2);
+			const userExtensions = extensionsResult.extensions.filter(
+				(extension) => !extension.path.startsWith("<builtin:"),
+			);
+			expect(userExtensions).toHaveLength(2);
 			expect(extensionsResult.errors.some((e) => e.error.includes('Command "/deploy" conflicts'))).toBe(false);
 
 			const sessionManager = SessionManager.inMemory();
 			const authStorage = AuthStorage.create(join(tempDir, "auth.json"));
 			const modelRegistry = ModelRegistry.create(authStorage);
 			const runner = new ExtensionRunner(
-				extensionsResult.extensions,
+				userExtensions,
 				extensionsResult.runtime,
 				cwd,
 				sessionManager,

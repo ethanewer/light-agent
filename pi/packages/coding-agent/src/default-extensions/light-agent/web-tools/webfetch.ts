@@ -2,11 +2,11 @@ import type { AgentTool } from "@mariozechner/pi-agent-core";
 import { Text } from "@mariozechner/pi-tui";
 import TurndownService from "turndown";
 import { type Static, Type } from "typebox";
-import { keyHint } from "../../modes/interactive/components/keybinding-hints.js";
-import type { ToolDefinition, ToolRenderResultOptions } from "../extensions/types.js";
-import { getTextOutput, invalidArgText, str } from "./render-utils.js";
-import { wrapToolDefinition } from "./tool-definition-wrapper.js";
-import { DEFAULT_MAX_BYTES, formatSize, type TruncationResult, truncateHead } from "./truncate.js";
+import type { ToolDefinition, ToolRenderResultOptions } from "../../../core/extensions/types.js";
+import { getTextOutput, invalidArgText, str } from "../../../core/tools/render-utils.js";
+import { wrapToolDefinition } from "../../../core/tools/tool-definition-wrapper.js";
+import { DEFAULT_MAX_BYTES, formatSize, type TruncationResult, truncateHead } from "../../../core/tools/truncate.js";
+import { keyHint } from "../../../modes/interactive/components/keybinding-hints.js";
 
 const MAX_RESPONSE_SIZE = 5 * 1024 * 1024; // 5MB
 const DEFAULT_TIMEOUT_MS = 30 * 1000; // 30 seconds
@@ -56,7 +56,7 @@ function shortenUrl(url: string, maxLength = 80): string {
 
 function formatWebFetchCall(
 	args: { url?: string; format?: string; timeout?: number } | undefined,
-	theme: typeof import("../../modes/interactive/theme/theme.js").theme,
+	theme: typeof import("../../../modes/interactive/theme/theme.js").theme,
 ): string {
 	const url = str(args?.url);
 	const format = str(args?.format);
@@ -73,7 +73,7 @@ function formatWebFetchResult(
 		details?: WebFetchToolDetails;
 	},
 	options: ToolRenderResultOptions,
-	theme: typeof import("../../modes/interactive/theme/theme.js").theme,
+	theme: typeof import("../../../modes/interactive/theme/theme.js").theme,
 	showImages: boolean,
 ): string {
 	const output = getTextOutput(result, showImages).trim();

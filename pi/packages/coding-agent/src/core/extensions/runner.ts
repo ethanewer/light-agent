@@ -191,6 +191,8 @@ const noOpUIContext: ExtensionUIContext = {
 	input: async () => undefined,
 	notify: () => {},
 	onTerminalInput: () => () => {},
+	addEditorInputHandler: () => () => {},
+	setEditorPlaceholder: () => {},
 	setStatus: () => {},
 	setWorkingMessage: () => {},
 	setWorkingIndicator: () => {},

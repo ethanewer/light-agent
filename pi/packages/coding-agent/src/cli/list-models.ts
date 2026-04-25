@@ -6,7 +6,9 @@ import type { Api, Model } from "@mariozechner/pi-ai";
 import { fuzzyFilter } from "@mariozechner/pi-tui";
 import chalk from "chalk";
 import { formatNoModelsAvailableMessage } from "../core/auth-guidance.js";
-import { LM_STUDIO_PROVIDER } from "../core/lmstudio-discovery.js";
+
+const LM_STUDIO_PROVIDER = "lmstudio";
+
 import type { ModelRegistry } from "../core/model-registry.js";
 
 /**

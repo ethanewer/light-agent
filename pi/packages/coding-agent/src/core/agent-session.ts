@@ -813,22 +813,13 @@ export class AgentSession {
 		this.agent.state.systemPrompt = this._getEffectiveBaseSystemPrompt();
 	}
 
-	/**
-	 * Override the base system prompt with a raw string.
-	 *
-	 * Bypasses the normal prompt-building pipeline (tool snippets, skills,
-	 * context files, etc.). The override persists until
-	 * `clearSystemPromptOverride` is called.
-	 * Changes take effect on the next agent turn.
-	 */
+	/** Override the base system prompt with a raw string until cleared. */
 	setSystemPrompt(prompt: string): void {
 		this._systemPromptOverride = prompt;
 		this.agent.state.systemPrompt = this._getEffectiveBaseSystemPrompt();
 	}
 
-	/**
-	 * Clear a raw system-prompt override and restore the normally-built prompt.
-	 */
+	/** Clear a raw system-prompt override and restore the normally-built prompt. */
 	clearSystemPromptOverride(): void {
 		this._systemPromptOverride = undefined;
 		this.agent.state.systemPrompt = this._baseSystemPrompt;
@@ -2341,12 +2332,15 @@ export class AgentSession {
 				}
 			}
 		} else if (options?.includeAllExtensionTools) {
-			for (const tool of wrappedExtensionTools) {
-				nextActiveToolNames.push(tool.name);
+			for (const tool of allCustomTools) {
+				if (tool.definition.defaultActive !== false) nextActiveToolNames.push(tool.definition.name);
 			}
 		} else if (!options?.activeToolNames) {
 			for (const toolName of this._toolRegistry.keys()) {
-				if (!previousRegistryNames.has(toolName)) {
+				if (
+					!previousRegistryNames.has(toolName) &&
+					this._toolDefinitions.get(toolName)?.definition.defaultActive !== false
+				) {
 					nextActiveToolNames.push(toolName);
 				}
 			}

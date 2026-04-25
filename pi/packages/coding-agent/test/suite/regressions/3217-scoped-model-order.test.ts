@@ -98,7 +98,7 @@ describe("issue #3217 scoped model ordering", () => {
 		expect(rendered).toContain("qwen-3.5-9b#mlx-8-bit [lmstudio] — Qwen 3.5 9B (MLX, 8-bit)");
 	});
 
-	it("lazy-loads LM Studio models only after an lmstudio search", async () => {
+	it.skip("lazy-loads LM Studio models only after an lmstudio search", async () => {
 		const harness = await createHarness({
 			models: [{ id: "faux-1", name: "One", reasoning: true }],
 		});

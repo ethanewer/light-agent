@@ -1,10 +1,10 @@
 import type { AgentTool } from "@mariozechner/pi-agent-core";
 import { Text } from "@mariozechner/pi-tui";
 import { type Static, Type } from "typebox";
-import { keyHint } from "../../modes/interactive/components/keybinding-hints.js";
-import type { ToolDefinition, ToolRenderResultOptions } from "../extensions/types.js";
-import { getTextOutput, invalidArgText, str } from "./render-utils.js";
-import { wrapToolDefinition } from "./tool-definition-wrapper.js";
+import type { ToolDefinition, ToolRenderResultOptions } from "../../../core/extensions/types.js";
+import { getTextOutput, invalidArgText, str } from "../../../core/tools/render-utils.js";
+import { wrapToolDefinition } from "../../../core/tools/tool-definition-wrapper.js";
+import { keyHint } from "../../../modes/interactive/components/keybinding-hints.js";
 
 const EXA_BASE_URL = "https://mcp.exa.ai";
 const EXA_ENDPOINT = "/mcp";
@@ -72,7 +72,7 @@ function shortenQuery(query: string, maxLength = 80): string {
 
 function formatWebSearchCall(
 	args: { query?: string; numResults?: number; type?: string } | undefined,
-	theme: typeof import("../../modes/interactive/theme/theme.js").theme,
+	theme: typeof import("../../../modes/interactive/theme/theme.js").theme,
 ): string {
 	const query = str(args?.query);
 	const type = str(args?.type);
@@ -92,7 +92,7 @@ function formatWebSearchResult(
 		content: Array<{ type: string; text?: string; data?: string; mimeType?: string }>;
 	},
 	options: ToolRenderResultOptions,
-	theme: typeof import("../../modes/interactive/theme/theme.js").theme,
+	theme: typeof import("../../../modes/interactive/theme/theme.js").theme,
 	showImages: boolean,
 ): string {
 	const output = getTextOutput(result, showImages).trim();
