@@ -460,4 +460,44 @@ describe("Agent", () => {
 		await agent.prompt("hello again");
 		expect(receivedSessionId).toBe("session-def");
 	});
+
+	it("forwards provider retry controls to streamFn options", async () => {
+		let receivedOptions: { timeoutMs?: number; maxRetries?: number; maxRetryDelayMs?: number } | undefined;
+		const agent = new Agent({
+			timeoutMs: 30_000,
+			maxRetries: 0,
+			maxRetryDelayMs: 45_000,
+			streamFn: (_model, _context, options) => {
+				receivedOptions = {
+					timeoutMs: options?.timeoutMs,
+					maxRetries: options?.maxRetries,
+					maxRetryDelayMs: options?.maxRetryDelayMs,
+				};
+				const stream = new MockAssistantStream();
+				queueMicrotask(() => {
+					const message = createAssistantMessage("ok");
+					stream.push({ type: "done", reason: "stop", message });
+				});
+				return stream;
+			},
+		});
+
+		await agent.prompt("hello");
+		expect(receivedOptions).toEqual({
+			timeoutMs: 30_000,
+			maxRetries: 0,
+			maxRetryDelayMs: 45_000,
+		});
+
+		agent.timeoutMs = 60_000;
+		agent.maxRetries = 1;
+		agent.maxRetryDelayMs = 90_000;
+
+		await agent.prompt("hello again");
+		expect(receivedOptions).toEqual({
+			timeoutMs: 60_000,
+			maxRetries: 1,
+			maxRetryDelayMs: 90_000,
+		});
+	});
 });

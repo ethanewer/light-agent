@@ -16,11 +16,19 @@ export interface BranchSummarySettings {
 	skipPrompt?: boolean; // default: false - when true, skips "Summarize branch?" prompt and defaults to no summary
 }
 
+export interface ProviderRetrySettings {
+	timeoutMs?: number; // SDK/provider request timeout in milliseconds
+	maxRetries?: number; // SDK/provider retry attempts
+	maxRetryDelayMs?: number; // default: 60000 (max server-requested delay before failing)
+}
+
 export interface RetrySettings {
 	enabled?: boolean; // default: true
 	maxRetries?: number; // default: 3
 	baseDelayMs?: number; // default: 2000 (exponential backoff: 2s, 4s, 8s)
+	/** @deprecated Use provider.maxRetryDelayMs instead. */
 	maxDelayMs?: number; // default: 60000 (max server-requested delay before failing)
+	provider?: ProviderRetrySettings;
 }
 
 export interface TerminalSettings {
@@ -101,11 +109,14 @@ export interface Settings {
 	sessionDir?: string; // Custom session storage directory (same format as --session-dir CLI flag)
 }
 
-/** Deep merge settings: project/overrides take precedence, nested objects merge recursively */
-function deepMergeSettings(base: Settings, overrides: Settings): Settings {
-	const result: Settings = { ...base };
+function isMergeableSettingsObject(value: unknown): value is Record<string, unknown> {
+	return typeof value === "object" && value !== null && !Array.isArray(value);
+}
 
-	for (const key of Object.keys(overrides) as (keyof Settings)[]) {
+function deepMergeRecord(base: Record<string, unknown>, overrides: Record<string, unknown>): Record<string, unknown> {
+	const result: Record<string, unknown> = { ...base };
+
+	for (const key of Object.keys(overrides)) {
 		const overrideValue = overrides[key];
 		const baseValue = base[key];
 
@@ -113,23 +124,19 @@ function deepMergeSettings(base: Settings, overrides: Settings): Settings {
 			continue;
 		}
 
-		// For nested objects, merge recursively
-		if (
-			typeof overrideValue === "object" &&
-			overrideValue !== null &&
-			!Array.isArray(overrideValue) &&
-			typeof baseValue === "object" &&
-			baseValue !== null &&
-			!Array.isArray(baseValue)
-		) {
-			(result as Record<string, unknown>)[key] = { ...baseValue, ...overrideValue };
+		if (isMergeableSettingsObject(overrideValue) && isMergeableSettingsObject(baseValue)) {
+			result[key] = deepMergeRecord(baseValue, overrideValue);
 		} else {
-			// For primitives and arrays, override value wins
-			(result as Record<string, unknown>)[key] = overrideValue;
+			result[key] = overrideValue;
 		}
 	}
 
 	return result;
+}
+
+/** Deep merge settings: project/overrides take precedence, nested objects merge recursively */
+function deepMergeSettings(base: Settings, overrides: Settings): Settings {
+	return deepMergeRecord(base as Record<string, unknown>, overrides as Record<string, unknown>) as Settings;
 }
 
 export type SettingsScope = "global" | "project";
@@ -352,6 +359,30 @@ export class SettingsManager {
 			} else {
 				delete settings.skills;
 			}
+		}
+
+		// Migrate retry.maxDelayMs -> retry.provider.maxRetryDelayMs
+		if (
+			"retry" in settings &&
+			typeof settings.retry === "object" &&
+			settings.retry !== null &&
+			!Array.isArray(settings.retry)
+		) {
+			const retrySettings = settings.retry as Record<string, unknown>;
+			const providerSettings =
+				typeof retrySettings.provider === "object" && retrySettings.provider !== null
+					? (retrySettings.provider as Record<string, unknown>)
+					: undefined;
+			if (
+				typeof retrySettings.maxDelayMs === "number" &&
+				(providerSettings?.maxRetryDelayMs === undefined || providerSettings?.maxRetryDelayMs === null)
+			) {
+				retrySettings.provider = {
+					...(providerSettings ?? {}),
+					maxRetryDelayMs: retrySettings.maxDelayMs,
+				};
+			}
+			delete retrySettings.maxDelayMs;
 		}
 
 		return settings as Settings;
@@ -688,7 +719,15 @@ export class SettingsManager {
 			enabled: this.getRetryEnabled(),
 			maxRetries: this.settings.retry?.maxRetries ?? 3,
 			baseDelayMs: this.settings.retry?.baseDelayMs ?? 2000,
-			maxDelayMs: this.settings.retry?.maxDelayMs ?? 60000,
+			maxDelayMs: this.settings.retry?.provider?.maxRetryDelayMs ?? this.settings.retry?.maxDelayMs ?? 60000,
+		};
+	}
+
+	getProviderRetrySettings(): { timeoutMs?: number; maxRetries?: number; maxRetryDelayMs: number } {
+		return {
+			timeoutMs: this.settings.retry?.provider?.timeoutMs,
+			maxRetries: this.settings.retry?.provider?.maxRetries,
+			maxRetryDelayMs: this.settings.retry?.provider?.maxRetryDelayMs ?? 60000,
 		};
 	}
 

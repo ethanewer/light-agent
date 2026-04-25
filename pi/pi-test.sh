@@ -19,6 +19,7 @@ if [[ "$NO_ENV" == "true" ]]; then
   unset ANTHROPIC_API_KEY
   unset ANTHROPIC_OAUTH_TOKEN
   unset OPENAI_API_KEY
+  unset DEEPSEEK_API_KEY
   unset GEMINI_API_KEY
   unset GROQ_API_KEY
   unset CEREBRAS_API_KEY
@@ -28,6 +29,9 @@ if [[ "$NO_ENV" == "true" ]]; then
   unset MISTRAL_API_KEY
   unset MINIMAX_API_KEY
   unset MINIMAX_CN_API_KEY
+  unset KIMI_API_KEY
+  unset HF_TOKEN
+  unset FIREWORKS_API_KEY
   unset AI_GATEWAY_API_KEY
   unset OPENCODE_API_KEY
   unset COPILOT_GITHUB_TOKEN
@@ -37,6 +41,7 @@ if [[ "$NO_ENV" == "true" ]]; then
   unset GOOGLE_CLOUD_PROJECT
   unset GCLOUD_PROJECT
   unset GOOGLE_CLOUD_LOCATION
+  unset GOOGLE_CLOUD_API_KEY
   unset AWS_PROFILE
   unset AWS_ACCESS_KEY_ID
   unset AWS_SECRET_ACCESS_KEY

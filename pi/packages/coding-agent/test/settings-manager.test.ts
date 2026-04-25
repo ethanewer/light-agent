@@ -213,6 +213,66 @@ describe("SettingsManager", () => {
 		});
 	});
 
+	describe("retry settings", () => {
+		it("should deep merge nested provider retry settings across scopes", () => {
+			writeFileSync(
+				join(agentDir, "settings.json"),
+				JSON.stringify({
+					retry: {
+						enabled: true,
+						maxRetries: 2,
+						baseDelayMs: 1000,
+						provider: {
+							timeoutMs: 30000,
+							maxRetries: 1,
+							maxRetryDelayMs: 45000,
+						},
+					},
+				}),
+			);
+			writeFileSync(
+				join(projectDir, ".pi", "settings.json"),
+				JSON.stringify({
+					retry: {
+						provider: {
+							maxRetries: 0,
+						},
+					},
+				}),
+			);
+
+			const manager = SettingsManager.create(projectDir, agentDir);
+
+			expect(manager.getRetrySettings()).toEqual({
+				enabled: true,
+				maxRetries: 2,
+				baseDelayMs: 1000,
+				maxDelayMs: 45000,
+			});
+			expect(manager.getProviderRetrySettings()).toEqual({
+				timeoutMs: 30000,
+				maxRetries: 0,
+				maxRetryDelayMs: 45000,
+			});
+		});
+
+		it("should keep maxDelayMs as a deprecated alias for provider maxRetryDelayMs", () => {
+			writeFileSync(
+				join(agentDir, "settings.json"),
+				JSON.stringify({
+					retry: {
+						maxDelayMs: 12000,
+					},
+				}),
+			);
+
+			const manager = SettingsManager.create(projectDir, agentDir);
+
+			expect(manager.getRetrySettings().maxDelayMs).toBe(12000);
+			expect(manager.getProviderRetrySettings().maxRetryDelayMs).toBe(12000);
+		});
+	});
+
 	describe("project settings directory creation", () => {
 		it("should not create .pi folder when only reading project settings", () => {
 			// Create agent dir with global settings, but NO .pi folder in project

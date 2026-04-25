@@ -67,6 +67,8 @@ type ProxySerializableStreamOptions = Pick<
 	| "metadata"
 	| "transport"
 	| "thinkingBudgets"
+	| "timeoutMs"
+	| "maxRetries"
 	| "maxRetryDelayMs"
 >;
 
@@ -109,6 +111,8 @@ function buildProxyRequestOptions(options: ProxyStreamOptions): ProxySerializabl
 		metadata: options.metadata,
 		transport: options.transport,
 		thinkingBudgets: options.thinkingBudgets,
+		timeoutMs: options.timeoutMs,
+		maxRetries: options.maxRetries,
 		maxRetryDelayMs: options.maxRetryDelayMs,
 	};
 }

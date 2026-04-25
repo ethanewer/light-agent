@@ -106,6 +106,8 @@ export interface AgentOptions {
 	sessionId?: string;
 	thinkingBudgets?: ThinkingBudgets;
 	transport?: Transport;
+	timeoutMs?: number;
+	maxRetries?: number;
 	maxRetryDelayMs?: number;
 	toolExecution?: ToolExecutionMode;
 }
@@ -182,6 +184,10 @@ export class Agent {
 	public thinkingBudgets?: ThinkingBudgets;
 	/** Preferred transport forwarded to the stream function. */
 	public transport: Transport;
+	/** Optional provider/SDK request timeout forwarded to the stream function. */
+	public timeoutMs?: number;
+	/** Optional provider/SDK retry attempts forwarded to the stream function. */
+	public maxRetries?: number;
 	/** Optional cap for provider-requested retry delays. */
 	public maxRetryDelayMs?: number;
 	/** Tool execution strategy for assistant messages that contain multiple tool calls. */
@@ -202,6 +208,8 @@ export class Agent {
 		this.sessionId = options.sessionId;
 		this.thinkingBudgets = options.thinkingBudgets;
 		this.transport = options.transport ?? "sse";
+		this.timeoutMs = options.timeoutMs;
+		this.maxRetries = options.maxRetries;
 		this.maxRetryDelayMs = options.maxRetryDelayMs;
 		this.toolExecution = options.toolExecution ?? "parallel";
 	}
@@ -417,6 +425,8 @@ export class Agent {
 			onResponse: this.onResponse,
 			transport: this.transport,
 			thinkingBudgets: this.thinkingBudgets,
+			timeoutMs: this.timeoutMs,
+			maxRetries: this.maxRetries,
 			maxRetryDelayMs: this.maxRetryDelayMs,
 			toolExecution: this.toolExecution,
 			beforeToolCall: this.beforeToolCall,

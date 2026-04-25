@@ -1,5 +1,13 @@
 # Changelog
 
+## [0.70.2] - 2026-04-24
+
+### Fixed
+
+- Fixed agent and proxy streams to forward provider `timeoutMs` and `maxRetries` controls alongside `maxRetryDelayMs`.
+
+## [0.70.1] - 2026-04-24
+
 ## [0.70.0] - 2026-04-23
 
 ## [0.69.0] - 2026-04-22
