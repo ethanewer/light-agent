@@ -7,6 +7,7 @@ PI_ROOT="${REPO_ROOT}/pi"
 BENCH_ROOT="${REPO_ROOT}/terminal-bench"
 BUNDLE_DIR="${PI_ROOT}/packages/coding-agent/dist"
 BINARY_PATH="${BUNDLE_DIR}/pi"
+MACOS_CA_BUNDLE_PATH="${BUNDLE_DIR}/macos-keychain-certs.pem"
 MANIFEST_PATH="${BENCH_ROOT}/bin/pi-benchmark-install.json"
 
 OS_NAME="$(uname -s)"
@@ -216,6 +217,32 @@ seed_google_oauth_stub_if_missing() {
 	fi
 }
 
+create_macos_ca_bundle() {
+	[[ "${OS_NAME}" == "Darwin" ]] || return 0
+	command -v security >/dev/null 2>&1 || return 0
+
+	log "Exporting macOS keychain certificates for the Bun binary"
+	local tmp_bundle
+	tmp_bundle="$(mktemp)"
+
+	local keychain
+	for keychain in \
+		"${HOME}/Library/Keychains/login.keychain-db" \
+		"/Library/Keychains/System.keychain" \
+		"/System/Library/Keychains/SystemRootCertificates.keychain"; do
+		if [[ -f "${keychain}" ]]; then
+			security find-certificate -a -p "${keychain}" >> "${tmp_bundle}" 2>/dev/null || true
+		fi
+	done
+
+	if grep -Fq -- "-----BEGIN CERTIFICATE-----" "${tmp_bundle}"; then
+		mv "${tmp_bundle}" "${MACOS_CA_BUNDLE_PATH}"
+	else
+		rm -f "${tmp_bundle}"
+		log "No macOS keychain certificates exported; continuing without ${MACOS_CA_BUNDLE_PATH}"
+	fi
+}
+
 GLOBAL_BIN_DIR="$(determine_global_bin_dir)"
 GLOBAL_PI_PATH="${GLOBAL_BIN_DIR}/pi"
 
@@ -237,6 +264,8 @@ if [[ ! -x "${BINARY_PATH}" ]]; then
 	fail "Expected pi binary at ${BINARY_PATH}, but it was not built."
 fi
 
+create_macos_ca_bundle
+
 log "Updating benchmark bundle manifest"
 mkdir -p "$(dirname "${MANIFEST_PATH}")"
 printf '{\n  "bundle_dir": "%s",\n  "binary_path": "%s"\n}\n' "${BUNDLE_DIR}" "${BINARY_PATH}" > "${MANIFEST_PATH}"
@@ -246,6 +275,9 @@ mkdir -p "${GLOBAL_BIN_DIR}"
 TMP_WRAPPER="$(mktemp)"
 cat > "${TMP_WRAPPER}" <<EOF
 #!/usr/bin/env bash
+if [[ -z "\${NODE_EXTRA_CA_CERTS:-}" && -f "${MACOS_CA_BUNDLE_PATH}" ]]; then
+	export NODE_EXTRA_CA_CERTS="${MACOS_CA_BUNDLE_PATH}"
+fi
 exec "${BINARY_PATH}" "\$@"
 EOF
 chmod +x "${TMP_WRAPPER}"
