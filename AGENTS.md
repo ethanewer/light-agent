@@ -2,26 +2,34 @@
 
 ## Layout
 
-- `pi/` — upstream [pi](https://github.com/mariozechner/pi-mono) monorepo (npm workspaces). All source lives here. See `pi/AGENTS.md` for upstream conventions.
-- `run-local-cli.sh` — incremental local launcher. `--full` forces a clean rebuild.
+- `pi/` — upstream [pi](https://github.com/badlogic/pi-mono) monorepo as a git submodule. Do not patch it for light-agent features; keep local behavior in extensions.
+- `extensions/light-agent/` — local pi extension package. This is where web tools, modes, and LM Studio discovery live.
+- `tests/` — root tests for the local extension package.
+- `run-local-cli.sh` — incremental local launcher. It builds upstream pi as needed and runs it with `--extension <repo-root>`. `--full` forces a clean rebuild.
 
 ## Type checking
 
 Run after source edits. Fast, no side effects:
 
 ```bash
-cd pi && npm run check    # biome + tsc across the monorepo
+npm run check
 ```
 
-Or just the type checker:
+For upstream pi type checking without formatting:
 
 ```bash
-cd pi && node node_modules/typescript/bin/tsc -p tsconfig.json --noEmit
+cd pi && node node_modules/@typescript/native-preview/bin/tsgo.js -p tsconfig.json --noEmit
 ```
 
 ## Tests
 
-Run the suite for the package you changed — don't run everything by default.
+Run the root suite for extension changes:
+
+```bash
+npm run test
+```
+
+Run the upstream suite for a pi package only if you changed or diagnosed that package:
 
 ```bash
 cd pi
@@ -46,12 +54,13 @@ npx tsx ../../node_modules/vitest/dist/cli.js --run test/<file>.test.ts
 For CLI, TUI, or local-provider changes, do not stop at unit tests. Verify the real behavior before claiming a fix:
 
 - run the local CLI (`./run-local-cli.sh ...`) and inspect the output
+- run the installer workflow with a temp bin when changing install behavior (`PI_GLOBAL_BIN_DIR="$(mktemp -d)" ./install-cli.sh`)
 - if the bug involves interactive behavior, drive the real TUI with `tmux` and capture the pane
 - if the bug depends on a local server (for example LM Studio), inspect the live endpoint payloads as well as the CLI output
 
 ## Don't run
 
-`npm run dev`, `npm run build`, and repo-root `npm test` — slow, network-dependent, or never exit.
+`npm run dev`, `npm run build`, and repo-root `npm test` — slow, network-dependent, or not part of this repo's extension workflow. Use `npm run test`.
 
 ## Scope
 

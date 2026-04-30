@@ -1,0 +1,4 @@
+[submodule "pi"]
+	path = pi
+	url = https://github.com/badlogic/pi-mono.git
+	branch = main

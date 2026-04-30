@@ -1,0 +1,38 @@
+{
+	"name": "light-agent",
+	"version": "0.1.0",
+	"private": true,
+	"type": "module",
+	"keywords": ["pi-package"],
+	"pi": {
+		"extensions": ["extensions/light-agent/index.ts"]
+	},
+	"scripts": {
+		"prepare:pi": "./run-local-cli.sh --version >/dev/null",
+		"check": "npm run prepare:pi && tsc -p tsconfig.json --noEmit",
+		"test": "npm run prepare:pi && npm run test:unit",
+		"test:unit": "tsx --test tests/*.test.ts",
+		"verify": "npm run check && npm run test:unit"
+	},
+	"dependencies": {
+		"turndown": "^7.2.0"
+	},
+	"peerDependencies": {
+		"@mariozechner/pi-agent-core": "*",
+		"@mariozechner/pi-ai": "*",
+		"@mariozechner/pi-coding-agent": "*",
+		"@mariozechner/pi-tui": "*",
+		"typebox": "*"
+	},
+	"devDependencies": {
+		"@mariozechner/pi-agent-core": "file:pi/packages/agent",
+		"@mariozechner/pi-ai": "file:pi/packages/ai",
+		"@mariozechner/pi-coding-agent": "file:pi/packages/coding-agent",
+		"@mariozechner/pi-tui": "file:pi/packages/tui",
+		"@types/node": "^22.10.5",
+		"@types/turndown": "^5.0.5",
+		"tsx": "^4.20.3",
+		"typebox": "^1.0.55",
+		"typescript": "^5.9.2"
+	}
+}
