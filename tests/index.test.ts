@@ -74,8 +74,8 @@ test("lightAgentExtension skips startup discovery network calls in offline mode"
 	} as never);
 
 	assert.deepEqual(registeredTools, ["webfetch", "websearch"]);
-	assert.deepEqual(registeredCommands, ["mode"]);
-	assert.equal(registeredShortcuts.length, 1);
+	assert.deepEqual(registeredCommands, ["search", "chat"]);
+	assert.equal(registeredShortcuts.length, 0);
 	assert.deepEqual(handlers, ["session_start", "session_tree", "before_agent_start"]);
 	assert.deepEqual(providers, []);
 });
